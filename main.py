@@ -161,7 +161,7 @@ st.subheader("Gantt jerárquico tipo Microsoft Project")
 
 html = build_ms_project_gantt_html(current_df)
 num_rows = len(current_df)
-height = max(300, 40 * num_rows)
+height = max(400, 40 * num_rows)
 components.html(html, height=height, scrolling=True)
 
 
