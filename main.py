@@ -64,8 +64,21 @@ with st.sidebar:
 
 
 df = st.session_state["df"].copy()
-df["start_date"] = pd.to_datetime(df["start_date"], errors="coerce").dt.date
-df["end_date"] = pd.to_datetime(df["end_date"], errors="coerce").dt.date
+
+
+# fechas correctas
+df["start_date"] = pd.to_datetime(df["start_date"], errors="coerce")
+df["end_date"] = pd.to_datetime(df["end_date"], errors="coerce")
+
+# numérico
+df["progress"] = pd.to_numeric(df["progress"], errors="coerce").fillna(0)
+
+# strings SOLO donde aplica
+text_cols = ["level", "project_id", "project_name", "item_name",
+             "responsible", "status", "timeline_status", "document_url"]
+
+for col in text_cols:
+    df[col] = df[col].fillna("").astype(str)
 
 
 cols_to_hide = ["item_id", "parent_id"]
@@ -86,10 +99,7 @@ df["progress"] = pd.to_numeric(df["progress"], errors="coerce").fillna(0)
 # limpiar NaN y tipos conflictivos
 df = df.fillna("")
 
-# convertir todo a tipos seguros
-for col in df.columns:
-    if col not in ["progress"]:  # dejar numeric intacto
-        df[col] = df[col].astype(str)
+
 
 df["progress"] = pd.to_numeric(df["progress"], errors="coerce").fillna(0)
 
