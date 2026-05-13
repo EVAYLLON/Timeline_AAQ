@@ -64,8 +64,8 @@ with st.sidebar:
 
 
 df = st.session_state["df"].copy()
-df["start_date"] = pd.to_datetime(df["start_date"]).dt.date
-df["end_date"] = pd.to_datetime(df["end_date"]).dt.date
+df["start_date"] = pd.to_datetime(df["start_date"], errors="coerce").dt.date
+df["end_date"] = pd.to_datetime(df["end_date"], errors="coerce").dt.date
 
 
 cols_to_hide = ["item_id", "parent_id"]
@@ -83,15 +83,26 @@ df["document_url"] = df["document_url"].astype(str)
 
 df["progress"] = pd.to_numeric(df["progress"], errors="coerce").fillna(0)
 
+# limpiar NaN y tipos conflictivos
+df = df.fillna("")
+
+# convertir todo a tipos seguros
+for col in df.columns:
+    if col not in ["progress"]:  # dejar numeric intacto
+        df[col] = df[col].astype(str)
+
+df["progress"] = pd.to_numeric(df["progress"], errors="coerce").fillna(0)
+
 df_display = df.drop(columns=["item_id", "parent_id"], errors="ignore")
 
 edited_df = st.data_editor(
     df_display,
-    use_container_width=True,
-    num_rows="dynamic"
+    use_container_width=True
 )
 
 
+full_df = df.copy()
+full_df.update(edited_df)
 
 if df.empty:
     st.warning("No existen proyectos cargados.")
