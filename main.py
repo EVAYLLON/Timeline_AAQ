@@ -63,7 +63,11 @@ with st.sidebar:
 
 
 df = st.session_state["df"].copy()
-df_display = df.drop(columns=["item_id", "parent_id"])
+
+cols_to_hide = ["item_id", "parent_id"]
+
+df_display = df.drop(columns=[col for col in cols_to_hide if col in df.columns])
+
 
 if df.empty:
     st.warning("No existen proyectos cargados.")
@@ -115,6 +119,9 @@ edited_df = st.data_editor(
     disabled=["timeline_status", "level_order"],
     key="task_editor"
 )
+# reconstruir dataframe completo (con columnas ocultas)
+full_df = df.copy()
+full_df.update(edited_df)
 
 
 col1, col2, col3 = st.columns(3)
