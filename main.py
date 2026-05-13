@@ -173,12 +173,12 @@ with col1:
 
 with col2:
     if st.button("Actualizar Gantt"):
-        st.session_state["df"] = flatten_tasks(dataframe_to_nested_json(edited_df))
+        st.session_state["df"] = flatten_tasks(dataframe_to_nested_json(full_df))
         st.success("Gantt actualizado")
 
 with col3:
     if st.button("Exportar Gantt HTML"):
-        current_df = flatten_tasks(dataframe_to_nested_json(edited_df))
+        current_df = flatten_tasks(dataframe_to_nested_json(full_df))
         html = build_ms_project_gantt_html(current_df, zoom=zoom)
         export_gantt_html(html, REPORT_PATH)
         st.success(f"Gantt exportado en: {REPORT_PATH}")
@@ -186,7 +186,7 @@ with col3:
 
 st.markdown("---")
 
-current_df = flatten_tasks(dataframe_to_nested_json(edited_df))
+current_df = flatten_tasks(dataframe_to_nested_json(full_df))
 
 kpi1, kpi2, kpi3, kpi4 = st.columns(4)
 kpi1.metric("Total elementos", len(current_df))
