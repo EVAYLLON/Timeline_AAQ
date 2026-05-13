@@ -137,7 +137,7 @@ with col2:
 with col3:
     if st.button("Exportar Gantt HTML"):
         current_df = flatten_tasks(dataframe_to_nested_json(edited_df))
-        html = build_ms_project_gantt_html(current_df)
+        html = build_ms_project_gantt_html(current_df, zoom=zoom)
         export_gantt_html(html, REPORT_PATH)
         st.success(f"Gantt exportado en: {REPORT_PATH}")
 
@@ -152,6 +152,10 @@ kpi2.metric("Completados", int((current_df["timeline_status"] == "Completado").s
 kpi3.metric("En riesgo", int((current_df["timeline_status"] == "En riesgo").sum()))
 kpi4.metric("Vencidos", int((current_df["timeline_status"] == "Vencido").sum()))
 
+zoom = st.selectbox(
+    "Zoom del Gantt",
+    ["Proyecto completo", "30 días", "60 días"]
+)
 
 st.subheader("Gantt jerárquico tipo Microsoft Project")
 
