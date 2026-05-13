@@ -1,0 +1,69 @@
+{
+    "projects": [
+        {
+            "project_id": "PRJ-001",
+            "project_name": "Implementación Data Lake Hídrico",
+            "owner": "Daniel Alarcon",
+            "status": "En curso",
+            "start_date": "2026-05-01",
+            "end_date": "2026-08-30",
+            "document_url": "https://sharepoint.com/sites/proyecto/documento-general",
+            "tasks": [
+                {
+                    "task_id": "T-001",
+                    "task_name": "Levantamiento de información",
+                    "responsible": "Equipo Hidrología",
+                    "start_date": "2026-05-01",
+                    "end_date": "2026-05-20",
+                    "progress": 70,
+                    "status": "En curso",
+                    "document_url": "https://sharepoint.com/sites/proyecto/levantamiento",
+                    "subtasks": [
+                        {
+                            "subtask_id": "ST-001",
+                            "subtask_name": "Inventario de fuentes de datos",
+                            "responsible": "Analista Data",
+                            "start_date": "2026-05-01",
+                            "end_date": "2026-05-08",
+                            "progress": 100,
+                            "status": "Completado",
+                            "document_url": "https://sharepoint.com/sites/proyecto/inventario"
+                        },
+                        {
+                            "subtask_id": "ST-002",
+                            "subtask_name": "Validación con áreas usuarias",
+                            "responsible": "PM Proyecto",
+                            "start_date": "2026-05-09",
+                            "end_date": "2026-05-20",
+                            "progress": 40,
+                            "status": "En curso",
+                            "document_url": "https://sharepoint.com/sites/proyecto/validacion"
+                        }
+                    ]
+                },
+                {
+                    "task_id": "T-002",
+                    "task_name": "Diseño del modelo de datos",
+                    "responsible": "Data Engineer",
+                    "start_date": "2026-05-21",
+                    "end_date": "2026-06-15",
+                    "progress": 10,
+                    "status": "No iniciado",
+                    "document_url": "",
+                    "subtasks": [
+                        {
+                            "subtask_id": "ST-003",
+                            "subtask_name": "Modelo conceptual",
+                            "responsible": "Data Engineer",
+                            "start_date": "2026-05-21",
+                            "end_date": "2026-05-30",
+                            "progress": 0,
+                            "status": "No iniciado",
+                            "document_url": ""
+                        }
+                    ]
+                }
+            ]
+        }
+    ]
+}
