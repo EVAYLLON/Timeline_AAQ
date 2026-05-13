@@ -47,6 +47,9 @@ def build_ms_project_gantt_html(df: pd.DataFrame, title: str = "Gantt de Seguimi
     else:
         max_date = data["end_date"].max()
         total_days = max((max_date - min_date).days, 1)
+        # FILTRAR datos dentro del rango visible
+        data = data[data["start_date"] <= max_date]
+        data = data[data["end_date"] >= min_date]
 
         months = _date_range_months(min_date, max_date)
 
@@ -68,8 +71,12 @@ def build_ms_project_gantt_html(df: pd.DataFrame, title: str = "Gantt de Seguimi
         style = LEVEL_STYLES.get(level, LEVEL_STYLES["Subtarea"])
         color = STATUS_COLORS.get(row["timeline_status"], "#607D8B")
 
-        left = ((row["start_date"] - min_date).days / total_days) * 100
-        width = max((row["duration_days"] / total_days) * 100, 1.5)
+        start = max(row["start_date"], min_date)
+        end = min(row["end_date"], max_date)
+
+        left = ((start - min_date).days / total_days) * 100
+        width = max(((end - start).days / total_days) * 100, 1.5)
+
         progress_width = max(min(float(row["progress"]), 100), 0)
         link_html = _safe_link(row.get("document_url", ""))
 
