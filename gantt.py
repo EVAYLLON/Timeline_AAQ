@@ -46,7 +46,8 @@ def build_ms_project_gantt_html(df: pd.DataFrame, title: str = "Gantt de Seguimi
         max_date = min_date + pd.Timedelta(days=60)
     else:
         max_date = data["end_date"].max()
-
+        total_days = max((max_date - min_date).days, 1)
+        months = _date_range_months(min_date, max_date)
 
 # Recortar tareas al rango visible
         data = data[data["end_date"] >= min_date]
