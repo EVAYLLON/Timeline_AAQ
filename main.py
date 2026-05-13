@@ -70,10 +70,26 @@ df["end_date"] = pd.to_datetime(df["end_date"]).dt.date
 
 cols_to_hide = ["item_id", "parent_id"]
 
-df_display = df.drop(columns=cols_to_hide, errors="ignore")
 
+# asegurar tipos consistentes
+df["level"] = df["level"].astype(str)
+df["project_id"] = df["project_id"].astype(str)
+df["project_name"] = df["project_name"].astype(str)
+df["item_name"] = df["item_name"].astype(str)
+df["responsible"] = df["responsible"].astype(str)
+df["status"] = df["status"].astype(str)
+df["timeline_status"] = df["timeline_status"].astype(str)
+df["document_url"] = df["document_url"].astype(str)
 
-edited_df = st.data_editor(df_display, use_container_width=True)
+df["progress"] = pd.to_numeric(df["progress"], errors="coerce").fillna(0)
+
+df_display = df.drop(columns=["item_id", "parent_id"], errors="ignore")
+
+edited_df = st.data_editor(
+    df_display,
+    use_container_width=True,
+    num_rows="dynamic"
+)
 
 
 
