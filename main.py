@@ -62,11 +62,13 @@ with st.sidebar:
     st.info("Edita la tabla, guarda cambios y actualiza el Gantt.")
 
 
+
 df = st.session_state["df"].copy()
 
-cols_to_hide = ["item_id", "parent_id"]
+df_display = df.drop(columns=["item_id", "parent_id"], errors="ignore")
 
-df_display = df.drop(columns=[col for col in cols_to_hide if col in df.columns])
+edited_df = st.data_editor(df_display)
+
 
 
 if df.empty:
