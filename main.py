@@ -13,9 +13,8 @@ from gantt import build_ms_project_gantt_html, export_gantt_html
 
 
 BASE_DIR = Path(__file__).resolve().parent
-PROJECT_DIR = BASE_DIR / "ProjectTracker"
-JSON_PATH = PROJECT_DIR / "config" / "tasks.json"
-REPORT_PATH = PROJECT_DIR / "reports" / "gantt.html"
+JSON_PATH = BASE_DIR / "config" / "tasks.json"
+REPORT_PATH = BASE_DIR / "reports" / "gantt.html"
 
 st.set_page_config(
     page_title="Project Tracker MS Project Style",
