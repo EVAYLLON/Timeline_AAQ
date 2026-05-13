@@ -63,6 +63,7 @@ with st.sidebar:
 
 
 df = st.session_state["df"].copy()
+df_display = df.drop(columns=["item_id", "parent_id"])
 
 if df.empty:
     st.warning("No existen proyectos cargados.")
@@ -71,8 +72,9 @@ if df.empty:
 
 st.subheader("Tabla editable de seguimiento")
 
+
 edited_df = st.data_editor(
-    df,
+    df_display,
     use_container_width=True,
     num_rows="dynamic",
     column_config={
@@ -106,7 +108,8 @@ edited_df = st.data_editor(
             disabled=True
         ),
         "document_url": st.column_config.LinkColumn(
-            "Documento SharePoint / Link",
+            "Documento",
+            display_text="Abrir documento",
             validate=r"^https?://.*"
         )
     },
@@ -121,6 +124,9 @@ col1, col2, col3 = st.columns(3)
 with col1:
     if st.button("Guardar cambios en JSON", type="primary"):
         clean_df = edited_df.copy()
+        # volver a agregar columnas internas
+        clean_df["item_id"] = df["item_id"]
+        clean_df["parent_id"] = df["parent_id"]
         clean_df["start_date"] = pd.to_datetime(clean_df["start_date"])
         clean_df["end_date"] = pd.to_datetime(clean_df["end_date"])
 
