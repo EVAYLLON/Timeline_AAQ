@@ -95,22 +95,6 @@ df["progress"] = pd.to_numeric(df["progress"], errors="coerce").fillna(0)
 
 df_display = df.drop(columns=["item_id", "parent_id"], errors="ignore")
 
-edited_df = st.data_editor(
-    df_display,
-    use_container_width=True
-)
-
-
-full_df = df.copy()
-full_df.update(edited_df)
-
-if df.empty:
-    st.warning("No existen proyectos cargados.")
-    st.stop()
-
-
-st.subheader("Tabla editable de seguimiento")
-
 
 edited_df = st.data_editor(
     df_display,
@@ -150,10 +134,11 @@ edited_df = st.data_editor(
             validate=r"^https?://.*"
         )
     },
-    hidden_columns=["parent_id", "item_id"],
     disabled=["timeline_status", "level_order"],
     key="task_editor"
 )
+
+
 # reconstruir dataframe completo (con columnas ocultas)
 full_df = df.copy()
 full_df.update(edited_df)
