@@ -29,7 +29,7 @@ def _safe_link(url: str) -> str:
     return ""
 
 
-def build_ms_project_gantt_html(df: pd.DataFrame, title: str = "Gantt de Seguimiento") -> str:
+def build_ms_project_gantt_html(df: pd.DataFrame, title: str = "Gantt de Seguimiento", zoom: str = "Proyecto completo") -> str:
     if df.empty:
         return "<p>No existen datos para construir el Gantt.</p>"
 
@@ -39,10 +39,16 @@ def build_ms_project_gantt_html(df: pd.DataFrame, title: str = "Gantt de Seguimi
     data["duration_days"] = (data["end_date"] - data["start_date"]).dt.days.clip(lower=1)
 
     min_date = data["start_date"].min()
-    max_date = data["end_date"].max()
-    total_days = max((max_date - min_date).days, 1)
 
-    months = _date_range_months(min_date, max_date)
+    if zoom == "30 días":
+        max_date = min_date + pd.Timedelta(days=30)
+    elif zoom == "60 días":
+        max_date = min_date + pd.Timedelta(days=60)
+    else:
+        max_date = data["end_date"].max()
+        total_days = max((max_date - min_date).days, 1)
+
+        months = _date_range_months(min_date, max_date)
 
     month_headers = ""
     for m in months:
