@@ -160,7 +160,9 @@ zoom = st.selectbox(
 st.subheader("Gantt jerárquico tipo Microsoft Project")
 
 html = build_ms_project_gantt_html(current_df)
-components.html(html, height=500, scrolling=True)
+num_rows = len(current_df)
+height = max(300, 40 * num_rows)
+components.html(html, height=height, scrolling=True)
 
 
 st.subheader("Referencias documentales")
