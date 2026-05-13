@@ -64,10 +64,16 @@ with st.sidebar:
 
 
 df = st.session_state["df"].copy()
+df["start_date"] = pd.to_datetime(df["start_date"]).dt.date
+df["end_date"] = pd.to_datetime(df["end_date"]).dt.date
 
-df_display = df.drop(columns=["item_id", "parent_id"], errors="ignore")
 
-edited_df = st.data_editor(df_display)
+cols_to_hide = ["item_id", "parent_id"]
+
+df_display = df.drop(columns=cols_to_hide, errors="ignore")
+
+
+edited_df = st.data_editor(df_display, use_container_width=True)
 
 
 
