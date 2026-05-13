@@ -110,6 +110,7 @@ edited_df = st.data_editor(
             validate=r"^https?://.*"
         )
     },
+    hidden_columns=["parent_id", "item_id"],
     disabled=["timeline_status", "level_order"],
     key="task_editor"
 )
