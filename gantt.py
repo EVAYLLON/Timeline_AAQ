@@ -34,20 +34,25 @@ def build_ms_project_gantt_html(df: pd.DataFrame, title: str = "Gantt de Seguimi
         return "<p>No existen datos para construir el Gantt.</p>"
 
     data = df.copy()
+# --- DEFINIR RANGO BASE ---
     data["start_date"] = pd.to_datetime(data["start_date"])
     data["end_date"] = pd.to_datetime(data["end_date"])
-    data["duration_days"] = (data["end_date"] - data["start_date"]).dt.days.clip(lower=1)
 
-    min_date = data["start_date"].min()
+    base_min = data["start_date"].min()
+    base_max = data["end_date"].max()
 
+    # --- APLICAR ZOOM ---
     if zoom == "30 días":
-        max_date = min_date + pd.Timedelta(days=30)
+        min_date = base_min
+        max_date = base_min + pd.Timedelta(days=30)
+
     elif zoom == "60 días":
-        max_date = min_date + pd.Timedelta(days=60)
+        min_date = base_min
+        max_date = base_min + pd.Timedelta(days=60)
+
     else:
-        max_date = data["end_date"].max()
-        total_days = max((max_date - min_date).days, 1)
-        months = _date_range_months(min_date, max_date)
+        min_date = base_min
+        max_date = base_max
 
 # Recortar tareas al rango visible
         data = data[data["end_date"] >= min_date]
