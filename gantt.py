@@ -119,77 +119,39 @@ def build_ms_project_gantt_html(df, zoom="Proyecto completo"):
     html = f'''
     <style>
 
-    .gantt-header {{
+    .gantt-wrapper {
+        border: 1px solid #d1d5db;
+        border-radius: 6px;
+        overflow: auto;
+        background: #ffffff;
+    }
+
+    /* HEADER */
+    .gantt-header {
         display: grid;
         grid-template-columns: 760px 1fr;
         background: #f3f4f6;
-    }}
+    }
 
-    .table-header {{
+    .table-header {
         display: grid;
         grid-template-columns: 220px 120px 90px 90px 65px 105px 70px;
         font-weight: bold;
-    }}
+        font-size: 13px;
+    }
 
-    .gantt-row {{
+    .table-header div {
+        padding: 10px 8px;
+        border-right: 1px solid #d1d5db;
+    }
+
+    /* FILAS */
+    .gantt-row {
         display: grid;
         grid-template-columns: 760px 1fr;
         min-height: 38px;
         align-items: center;
-        border-bottom: 1px solid #e5e7eb;
-    }}
 
-    .task-table {{
-        display: grid;
-        grid-template-columns: 220px 120px 90px 90px 65px 105px 70px;
-        font-size: 12px;
-    }}
-
-    .task-table > div {{
-        padding: 6px 8px;
-        border-right: 1px solid #e5e7eb;
-    }}
-
-    .tree-icon {{
-        display: inline-block;
-        width: 16px;
-    }}
-
-    .status-pill {{
-        color: white;
-        border-radius: 999px;
-        padding: 3px 8px;
-        font-size: 11px;
-        font-weight: bold;
-    }}
-
-    .timeline-header {{
-        position: relative;
-        height: 40px;
-    }}
-
-    .month-header {{
-        position: absolute;
-        font-size: 12px;
-        text-align: center;
-    }}
-
-    .timeline-cell {{
-        position: relative;
-        height: 38px;
-    }}
-
-    .bar {{
-        position: absolute;
-        top: 50%;
-        transform: translateY(-50%);
-        border-radius: 4px;
-    }}
-
-    .bar-progress {{
-        height: 100%;
-        background: rgba(255,255,255,0.4);
-    }}
 
     </style>
 
