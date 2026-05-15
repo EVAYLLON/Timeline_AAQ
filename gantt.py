@@ -48,11 +48,12 @@ def build_ms_project_gantt_html(df, zoom="Proyecto completo"):
         left = ((m - min_date).days / total_days) * 100
         width = max(((next_m - m).days / total_days) * 100, 4)
 
-        month_headers += f'''
-        <div class="month-header" style="left:{left:.2f}%; width:{width:.2f}%;">
-            {m.strftime("%b %Y")}
-        </div>
-        '''
+    month_headers += f'''
+    <div class="month-header" style="left:{left:.2f}%; width:{width:.2f}%;">
+        {m.strftime("%b %Y")}
+    </div>
+    '''
+
 
     # ✅ filas completas (PRO)
     rows_html = ""
@@ -70,74 +71,107 @@ def build_ms_project_gantt_html(df, zoom="Proyecto completo"):
 
         progress_width = max(min(float(row["progress"]), 100), 0)
 
-        rows_html += f'''
-        <div class="gantt-row">
+        rows_html = ""
 
-            <div class="task-table">
+        for _, row in data.iterrows():
+            level = row["level"]
+            style = LEVEL_STYLES.get(level, LEVEL_STYLES["Subtarea"])
+            color = STATUS_COLORS.get(row["timeline_status"], "#607D8B")
 
-                <div class="task-name" style="padding-left:{style["indent"]}px; font-weight:{style["font_weight"]};">
-                    <span class="tree-icon">{style["icon"]}</span>
-                    {escape(str(row["item_name"]))}
+            start = max(row["start_date"], min_date)
+            end = min(row["end_date"], max_date)
+
+            left = ((start - min_date).days / total_days) * 100
+            width = max(((end - start).days / total_days) * 100, 1.5)
+
+            rows_html += f'''
+            <div class="gantt-row">
+
+                <div class="task-table">
+                    <div style="padding-left:{style["indent"]}px; font-weight:{style["font_weight"]};">
+                        {style["icon"]} {escape(str(row["item_name"]))}
+                    </div>
+
+                    <div>{escape(str(row["responsible"]))}</div>
+
+                    <div>{row["start_date"].strftime("%d/%m/%Y")}</div>
+
+                    <div>{row["end_date"].strftime("%d/%m/%Y")}</div>
+
+                    <div>{int(row["progress"])}%</div>
+
+                    <div>{escape(str(row["timeline_status"]))}</div>
+
+                    <div></div>
                 </div>
 
-                <div>{escape(str(row["responsible"]))}</div>
-
-                <div>{row["start_date"].strftime("%d/%m/%Y")}</div>
-
-                <div>{row["end_date"].strftime("%d/%m/%Y")}</div>
-
-                <div>{int(row["progress"])}%</div>
-
-                <div>
-                    <span class="status-pill" style="background:{color};">
-                        {escape(str(row["timeline_status"]))}
-                    </span>
-                </div>
-
-                <div></div>
-
-            </div>
-
-            <div class="timeline-cell">
-                <div class="bar"
-                    style="
+                <div class="timeline-cell">
+                    <div class="bar" style="
                         left:{left:.2f}%;
                         width:{width:.2f}%;
-                        height:{style["bar_height"]}px;
                         background:{color};
-                        opacity:{style["opacity"]};
-                    ">
-
-                    <div class="bar-progress" style="width:{progress_width:.2f}%;"></div>
-
+                    "></div>
                 </div>
+
+            </div>
+            '''
+
+        html = f'''
+        <style>
+        .gantt-header {{
+            display: grid;
+            grid-template-columns: 760px 1fr;
+            background: #f3f4f6;
+        }}
+
+        .table-header {{
+            display: grid;
+            grid-template-columns: 220px 120px 90px 90px 65px 105px 70px;
+            font-weight: bold;
+        }}
+
+        .gantt-row {{
+            display: grid;
+            grid-template-columns: 760px 1fr;
+        }}
+
+        .task-table {{
+            display: grid;
+            grid-template-columns: 220px 120px 90px 90px 65px 105px 70px;
+        }}
+
+        .timeline-cell {{
+            position: relative;
+            height: 40px;
+        }}
+
+        .bar {{
+            position: absolute;
+            top: 10px;
+            height: 16px;
+            border-radius: 4px;
+        }}
+        </style>
+
+        <div class="gantt-header">
+            <div class="table-header">
+                <div>Proyecto</div>
+                <div>Responsable</div>
+                <div>Inicio</div>
+                <div>Fin</div>
+                <div>Avance</div>
+                <div>Estado</div>
+                <div>Link</div>
             </div>
 
+            <div class="timeline-header">
+                {month_headers}
+            </div>
         </div>
+
+        {rows_html}
         '''
 
-    html = f'''
-    <style>
-    .gantt-wrapper {{
-        border: 1px solid #d1d5db;
-    }}
-
-
-    .gantt-row {{
-        display: grid;
-    }}
-
-    .table-header {{
-        display: grid;
-    }}
-
-    </style>
-
-    <div class="gantt-wrapper">
-        {month_headers}
-        {rows_html}
-    </div>
-    '''
 
     return html
 
