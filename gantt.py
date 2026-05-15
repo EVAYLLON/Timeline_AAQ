@@ -160,27 +160,46 @@ def build_ms_project_gantt_html(df, title="Gantt de Seguimiento", zoom="Proyecto
         font-size: 12px;
     }}
 
-    .gantt-row {{
+    .gantt-row {
         display: grid;
-        grid-template-columns: 740px 1fr;
-    }}
+        grid-template-columns: 740px minmax(900px, 1fr);
+        min-height: 38px;              /* 👈 clave */
+        align-items: center;           /* 👈 clave */
+        border-bottom: 1px solid #e5e7eb;
+    }
+
+    /* jerarquía visual */
+    .gantt-row.proyecto {
+        background: #eef2ff;
+    }
+
+    .gantt-row.tarea {
+        background: #ffffff;
+    }
+
+    .gantt-row.subtarea {
+        background: #fafafa;
+    }
 
     .task-table {{
         display: grid;
         grid-template-columns: 220px 120px 90px 90px 65px 105px 70px;
     }}
-
-    .timeline-cell {{
+    .timeline-cell {
         position: relative;
-        height: 40px;
-    }}
+        min-height: 38px;              /* 👈 clave */
+        display: flex;
+        align-items: center;
+    }
 
-    .bar {{
+    .bar {
         position: absolute;
-        top: 12px;
+        top: 50%;
+        transform: translateY(-50%);
         border-radius: 4px;
-        height: 16px;
-    }}
+        min-width: 8px;               /* 👈 clave */
+        box-shadow: 0 1px 2px rgba(0,0,0,0.2);
+    }
 
     .bar-progress {{
         height: 100%;
