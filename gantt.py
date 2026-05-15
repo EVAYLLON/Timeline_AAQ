@@ -16,6 +16,12 @@ LEVEL_STYLES = {
 }
 
 
+def _safe_link(url):
+    if isinstance(url, str) and url.startswith("http"):
+        return f'<a href="{escape(url)}" target="_blank">Abrir</a>'
+    return ""
+
+
 def build_ms_project_gantt_html(df, zoom="Proyecto completo"):
 
     if df.empty:
@@ -58,7 +64,8 @@ def build_ms_project_gantt_html(df, zoom="Proyecto completo"):
     rows_html = ""
 
     for _, row in data.iterrows():
-        style = LEVEL_STYLES.get(row["level"], LEVEL_STYLES["Subtarea"])
+        level = row["level"]
+        style = LEVEL_STYLES.get(level, LEVEL_STYLES["Subtarea"])
         color = STATUS_COLORS.get(row["timeline_status"], "#607D8B")
 
         start = max(row["start_date"], min_date)
@@ -68,25 +75,36 @@ def build_ms_project_gantt_html(df, zoom="Proyecto completo"):
         width = max(((end - start).days / total_days) * 100, 1.5)
 
         progress_width = max(min(float(row["progress"]), 100), 0)
+        link_html = _safe_link(row.get("document_url", ""))
 
         rows_html += f'''
         <div class="gantt-row">
 
             <div class="task-table">
+
                 <div style="padding-left:{style["indent"]}px; font-weight:{style["font_weight"]};">
                     <span class="tree-icon">{style["icon"]}</span>
                     {escape(str(row["item_name"]))}
                 </div>
+
                 <div>{escape(str(row["responsible"]))}</div>
+
                 <div>{row["start_date"].strftime("%d/%m/%Y")}</div>
+
                 <div>{row["end_date"].strftime("%d/%m/%Y")}</div>
+
                 <div>{int(row["progress"])}%</div>
+
                 <div>
                     <span class="status-pill" style="background:{color};">
                         {escape(str(row["timeline_status"]))}
                     </span>
                 </div>
-                <div></div>
+
+                <div class="task-link">
+                    {link_html}
+                </div>
+
             </div>
 
             <div class="timeline-cell">
@@ -98,7 +116,9 @@ def build_ms_project_gantt_html(df, zoom="Proyecto completo"):
                         background:{color};
                         opacity:{style["opacity"]};
                     ">
+
                     <div class="bar-progress" style="width:{progress_width:.2f}%;"></div>
+
                 </div>
             </div>
 
@@ -114,6 +134,7 @@ def build_ms_project_gantt_html(df, zoom="Proyecto completo"):
     border-radius: 6px;
     overflow: auto;
     background: #ffffff;
+    font-family: Arial, Helvetica, sans-serif;
 }}
 
 .gantt-header {{
@@ -128,8 +149,10 @@ def build_ms_project_gantt_html(df, zoom="Proyecto completo"):
     font-weight: bold;
 }}
 
-.table-header div {{
-    padding: 8px;
+.table-header div,
+.task-table > div {{
+    padding: 6px 8px;
+    border-right: 1px solid #e5e7eb;
 }}
 
 .gantt-row {{
@@ -137,6 +160,11 @@ def build_ms_project_gantt_html(df, zoom="Proyecto completo"):
     grid-template-columns: 740px 1fr;
     min-height: 34px;
     align-items: center;
+    border-bottom: 1px solid #e5e7eb;
+}}
+
+.gantt-row:nth-child(even) {{
+    background: #fafafa;
 }}
 
 .task-table {{
@@ -148,16 +176,31 @@ def build_ms_project_gantt_html(df, zoom="Proyecto completo"):
 .timeline-header {{
     position: relative;
     height: 34px;
+    background: repeating-linear-gradient(
+        to right,
+        #ffffff 0px,
+        #ffffff 79px,
+        #e5e7eb 80px
+    );
 }}
 
 .timeline-cell {{
     position: relative;
     height: 34px;
+    background: repeating-linear-gradient(
+        to right,
+        #ffffff 0px,
+        #ffffff 79px,
+        #f3f4f6 80px
+    );
 }}
 
 .month-header {{
     position: absolute;
+    height: 34px;
     font-size: 12px;
+    text-align: center;
+    border-right: 1px solid #ccc;
 }}
 
 .bar {{
@@ -170,6 +213,7 @@ def build_ms_project_gantt_html(df, zoom="Proyecto completo"):
 .tree-icon {{
     display: inline-block;
     width: 16px;
+    color: #666;
 }}
 
 .status-pill {{
@@ -177,6 +221,12 @@ def build_ms_project_gantt_html(df, zoom="Proyecto completo"):
     border-radius: 999px;
     padding: 3px 6px;
     font-size: 11px;
+}}
+
+.task-link a {{
+    color: #1d4ed8;
+    text-decoration: none;
+    font-weight: 600;
 }}
 
 .bar-progress {{
