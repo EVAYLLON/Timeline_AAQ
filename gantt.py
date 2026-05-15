@@ -60,10 +60,25 @@ def build_ms_project_gantt_html(df: pd.DataFrame, title: str = "Gantt de Seguimi
     elif zoom == "60 días":
         max_date = base_min + pd.Timedelta(days=60)
 
-    # --- PROTECCIÓN (CRÍTICO) ---
+# --- PROTECCIÓN ---
     if pd.isna(min_date) or pd.isna(max_date):
         min_date = base_min
         max_date = base_max
+
+    # --- RECORTAR DATA AL ZOOM (SIEMPRE) ---
+    data = data[data["end_date"] >= min_date]
+    data = data[data["start_date"] <= max_date]
+
+    # --- CALCULAR RANGO ---
+    total_days = max((max_date - min_date).days, 1)
+
+    # --- GENERAR MESES (CLAVE) ---
+    months = _date_range_months(min_date, max_date)
+
+    # fallback (evita crash)
+    if not months:
+        months = [min_date]
+
 
 
 
