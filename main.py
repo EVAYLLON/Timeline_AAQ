@@ -139,7 +139,7 @@ edited_df = st.data_editor(
         "status": st.column_config.TextColumn(
             "Estado operativo",
             disabled=True
-        )
+        ),
         "timeline_status": st.column_config.TextColumn(
             "Estado plazo",
             disabled=True
