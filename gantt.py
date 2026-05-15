@@ -25,14 +25,17 @@ def _date_range_months(start, end):
 
     return months
 
+
 def _safe_link(url: str) -> str:
     if isinstance(url, str) and url.startswith("http"):
-        return f'<a href="{escape(url)}" targetturn ""
+        return f'<a href="{escape(url)}" target="_blank">Abrir</a>'
+    return ""
 
-def build_ms_project_gantt_html(df, title="Gantt de Seguimiento", zoom="Proyecto completo"):
+
+def build_ms_project_gantt_html(df, title="Gantt", zoom="Proyecto completo"):
 
     if df.empty:
-        return "<p>No existen datos para construir el Gantt.</p>"
+        return "<p>No existen datos</p>"
 
     data = df.copy()
 
@@ -55,16 +58,14 @@ def build_ms_project_gantt_html(df, title="Gantt de Seguimiento", zoom="Proyecto
     total_days = max((max_date - min_date).days, 1)
 
     months = _date_range_months(min_date, max_date)
-    if not months:
-        months = [min_date]
 
-    # HEADER
+    # ✅ HEADER
     month_headers = ""
     for m in months:
         next_m = m + pd.offsets.MonthBegin(1)
 
         left = ((m - min_date).days / total_days) * 100
-        width = max(((next_m - m).days / total_days) * 100, 4)
+        width = ((next_m - m).days / total_days) * 100
 
         month_headers += f'''
         <div class="month-header" style="left:{left:.2f}%; width:{width:.2f}%;">
@@ -72,123 +73,76 @@ def build_ms_project_gantt_html(df, title="Gantt de Seguimiento", zoom="Proyecto
         </div>
         '''
 
-    # FILAS
+    # ✅ FILAS
     rows_html = ""
 
     for _, row in data.iterrows():
-        level = row["level"]
-        style = LEVEL_STYLES.get(level, LEVEL_STYLES["Subtarea"])
+        style = LEVEL_STYLES.get(row["level"], LEVEL_STYLES["Subtarea"])
         color = STATUS_COLORS.get(row["timeline_status"], "#607D8B")
 
         start = max(row["start_date"], min_date)
         end = min(row["end_date"], max_date)
 
         left = ((start - min_date).days / total_days) * 100
-        width = max(((end - start).days / total_days) * 100, 1.5)
-
-        progress_width = max(min(float(row["progress"]), 100), 0)
-        link_html = _safe_link(row.get("document_url", ""))
+        width = ((end - start).days / total_days) * 100
 
         rows_html += f'''
-        <div class="gantt-row {level.lower()}">
+        <div class="gantt-row">
 
             <div class="task-table">
-
-                <div class="task-name" style="padding-left:{style["indent"]}px; font-weight:{style["font_weight"]};">
-                    <span class="tree-icon">{style["icon"]}</span>
-                    {escape(str(row["item_name"]))}
-                </div>
-
-                <div class="task-owner">{escape(str(row["responsible"]))}</div>
-
-                <div class="task-date">{row["start_date"].strftime("%d/%m/%Y")}</div>
-
-                <div class="task-date">{row["end_date"].strftime("%d/%m/%Y")}</div>
-
-                <div class="task-progress">{int(row["progress"])}%</div>
-
-                <div class="task-status">
-                    <span class="status-pill" style="background:{color};">
-                        {escape(str(row["timeline_status"]))}
-                    </span>
-                </div>
-
-                <div class="task-link">{link_html}</div>
-
+                <div style="padding-left:{style["indent"]}px;">{row["item_name"]}</div>
+                <div>{row["responsible"]}</div>
+                <div>{row["start_date"].strftime("%d/%m/%Y")}</div>
+                <div>{row["end_date"].strftime("%d/%m/%Y")}</div>
+                <div>{int(row["progress"])}%</div>
+                <div>{row["timeline_status"]}</div>
+                <div>{_safe_link(row.get("document_url",""))}</div>
             </div>
 
             <div class="timeline-cell">
-                <div class="bar"
-                    style="
-                        left:{left:.2f}%;
-                        width:{width:.2f}%;
-                        height:{style["bar_height"]}px;
-                        background:{color};
-                        opacity:{style["opacity"]};
-                    ">
-
-                    <div class="bar-progress" style="width:{progress_width:.2f}%;"></div>
-
-                </div>
+                <div class="bar" style="
+                    left:{left:.2f}%;
+                    width:{width:.2f}%;
+                    background:{color};
+                "></div>
             </div>
 
         </div>
         '''
 
-
+    # ✅ HTML CORRECTO PARA STREAMLIT
     html = f'''
-    <div>
-
     <style>
-
-    body {{
-        font-family: Arial, Helvetica, sans-serif;
-        background: #ffffff;
-    }}
-
     .gantt-wrapper {{
-        border: 1px solid #d1d5db;
-        border-radius: 8px;
+        border: 1px solid #ccc;
         overflow: auto;
     }}
 
     .gantt-header {{
         display: grid;
         grid-template-columns: 740px 1fr;
-        background: #f3f4f6;
+        background: #eee;
     }}
 
     .table-header {{
         display: grid;
         grid-template-columns: 220px 120px 90px 90px 65px 105px 70px;
-        font-weight: 700;
-    }}
-
-    .table-header div {{
-        padding: 10px 8px;
-        border-right: 1px solid #d1d5db;
+        font-weight: bold;
     }}
 
     .timeline-header {{
         position: relative;
         height: 40px;
-        border-left: 1px solid #d1d5db;
     }}
 
     .month-header {{
         position: absolute;
-        height: 40px;
         font-size: 12px;
-        text-align: center;
-        border-right: 1px solid #d1d5db;
     }}
 
     .gantt-row {{
         display: grid;
         grid-template-columns: 740px 1fr;
-        min-height: 38px;
-        align-items: center;
-        border-bottom: 1px solid #e5e7eb;
     }}
 
     .task-table {{
@@ -196,40 +150,16 @@ def build_ms_project_gantt_html(df, title="Gantt de Seguimiento", zoom="Proyecto
         grid-template-columns: 220px 120px 90px 90px 65px 105px 70px;
     }}
 
-    .task-table > div {{
-        padding: 7px 8px;
-        border-right: 1px solid #e5e7eb;
-    }}
-
-    .tree-icon {{
-        display: inline-block;
-        width: 16px;
-    }}
-
-    .status-pill {{
-        display: inline-block;
-        color: white;
-        border-radius: 999px;
-        padding: 3px 8px;
-        font-size: 11px;
-        font-weight: 700;
-    }}
-
     .timeline-cell {{
         position: relative;
-        height: 38px;
+        height: 40px;
     }}
 
     .bar {{
         position: absolute;
-        top: 50%;
-        transform: translateY(-50%);
+        top: 10px;
+        height: 18px;
         border-radius: 4px;
-    }}
-
-    .bar-progress {{
-        height: 100%;
-        background: rgba(255,255,255,0.4);
     }}
     </style>
 
@@ -257,10 +187,3 @@ def build_ms_project_gantt_html(df, title="Gantt de Seguimiento", zoom="Proyecto
     '''
 
     return html
-
-
-def export_gantt_html(html, output_path="reports/gantt.html"):
-    path = Path(output_path)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(html, encoding="utf-8")
-    return path
