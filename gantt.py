@@ -42,22 +42,29 @@ def build_ms_project_gantt_html(df: pd.DataFrame, title: str = "Gantt de Seguimi
 
     data = df.copy()
 # --- DEFINIR RANGO BASE ---
+# --- NORMALIZAR FECHAS ---
     data["start_date"] = pd.to_datetime(data["start_date"])
     data["end_date"] = pd.to_datetime(data["end_date"])
 
     base_min = data["start_date"].min()
     base_max = data["end_date"].max()
 
-    # DEFAULT
+    # --- RANGO POR DEFECTO ---
     min_date = base_min
     max_date = base_max
 
-    # APPLY ZOOM
+    # --- APLICAR ZOOM ---
     if zoom == "30 días":
         max_date = base_min + pd.Timedelta(days=30)
 
     elif zoom == "60 días":
         max_date = base_min + pd.Timedelta(days=60)
+
+    # --- PROTECCIÓN (CRÍTICO) ---
+    if pd.isna(min_date) or pd.isna(max_date):
+        min_date = base_min
+        max_date = base_max
+
 
 
 # Recortar tareas al rango visible
@@ -69,10 +76,6 @@ def build_ms_project_gantt_html(df: pd.DataFrame, title: str = "Gantt de Seguimi
         # FILTRAR datos dentro del rango visible
         data = data[data["start_date"] <= max_date]
         data = data[data["end_date"] >= min_date]
-
-        months = _date_range_months(min_date, max_date)
-        if not months:
-            months = [min_date]
 
 
     month_headers = ""
