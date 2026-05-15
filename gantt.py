@@ -125,28 +125,38 @@ def build_ms_project_gantt_html(df, title="Gantt de Seguimiento", zoom="Proyecto
         '''
 
     html = f'''
+    <!DOCTYPE html>
     <html>
     <head>
+    <meta charset="utf-8">
+
     <style>
-    body {{
-        font-family: Arial;
+    html, body {{
+        font-family: Arial, Helvetica, sans-serif;
+        background: #ffffff;
+        color: #1f2937;
     }}
 
     .gantt-wrapper {{
-        border: 1px solid #ccc;
+        border: 1px solid #d1d5db;
+        border-radius: 8px;
         overflow: auto;
     }}
 
     .gantt-header {{
         display: grid;
-        grid-template-columns: 740px 1fr;
-        background: #eee;
+        grid-template-columns: 740px minmax(900px, 1fr);
+        background: #f3f4f6;
     }}
 
     .table-header {{
         display: grid;
         grid-template-columns: 220px 120px 90px 90px 65px 105px 70px;
         font-weight: bold;
+    }}
+
+    .table-header div {{
+        padding: 10px;
     }}
 
     .timeline-header {{
@@ -156,61 +166,36 @@ def build_ms_project_gantt_html(df, title="Gantt de Seguimiento", zoom="Proyecto
 
     .month-header {{
         position: absolute;
-        text-align: center;
         font-size: 12px;
     }}
 
-    .gantt-row {
+    .gantt-row {{
         display: grid;
         grid-template-columns: 740px minmax(900px, 1fr);
-        min-height: 38px;              /* 👈 clave */
-        align-items: center;           /* 👈 clave */
-        border-bottom: 1px solid #e5e7eb;
-    }
-
-    /* jerarquía visual */
-    .gantt-row.proyecto {
-        background: #eef2ff;
-    }
-
-    .gantt-row.tarea {
-        background: #ffffff;
-    }
-
-    .gantt-row.subtarea {
-        background: #fafafa;
-    }
-
-    .task-table {{
-        display: grid;
-        grid-template-columns: 220px 120px 90px 90px 65px 105px 70px;
-    }}
-    .timeline-cell {
-        position: relative;
-        min-height: 38px;              /* 👈 clave */
-        display: flex;
+        min-height: 38px;
         align-items: center;
-    }
+    }}
 
-    .bar {
+    .timeline-cell {{
+        position: relative;
+        height: 38px;
+    }}
+
+    .bar {{
         position: absolute;
         top: 50%;
         transform: translateY(-50%);
         border-radius: 4px;
-        min-width: 8px;               /* 👈 clave */
-        box-shadow: 0 1px 2px rgba(0,0,0,0.2);
-    }
-
-    .bar-progress {{
-        height: 100%;
-        background: rgba(255,255,255,0.4);
     }}
+
     </style>
+
     </head>
 
     <body>
 
     <div class="gantt-wrapper">
+
         <div class="gantt-header">
             <div class="table-header">
                 <div>Proyecto</div>
@@ -221,6 +206,7 @@ def build_ms_project_gantt_html(df, title="Gantt de Seguimiento", zoom="Proyecto
                 <div>Estado</div>
                 <div>Link</div>
             </div>
+
             <div class="timeline-header">
                 {month_headers}
             </div>
@@ -233,7 +219,6 @@ def build_ms_project_gantt_html(df, title="Gantt de Seguimiento", zoom="Proyecto
     </body>
     </html>
     '''
-
     return html
 
 
