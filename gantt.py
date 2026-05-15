@@ -1,4 +1,5 @@
 from pathlib import Path
+from html import escape
 import pandas as pd
 
 STATUS_COLORS = {
@@ -7,6 +8,13 @@ STATUS_COLORS = {
     "En riesgo": "#F9A825",
     "Vencido": "#C62828"
 }
+
+LEVEL_STYLES = {
+    "Proyecto": {"indent": 0, "font_weight": "700", "bar_height": 22, "opacity": 1.0, "icon": "▾"},
+    "Tarea": {"indent": 20, "font_weight": "600", "bar_height": 18, "opacity": 0.95, "icon": "•"},
+    "Subtarea": {"indent": 42, "font_weight": "400", "bar_height": 14, "opacity": 0.85, "icon": "◦"}
+}
+
 
 def build_ms_project_gantt_html(df, zoom="Proyecto completo"):
 
@@ -18,22 +26,19 @@ def build_ms_project_gantt_html(df, zoom="Proyecto completo"):
     data["start_date"] = pd.to_datetime(data["start_date"])
     data["end_date"] = pd.to_datetime(data["end_date"])
 
-    base_min = data["start_date"].min()
-    base_max = data["end_date"].max()
-
-    min_date = base_min
-    max_date = base_max
+    min_date = data["start_date"].min()
+    max_date = data["end_date"].max()
 
     if zoom == "30 días":
-        max_date = base_min + pd.Timedelta(days=30)
+        max_date = min_date + pd.Timedelta(days=30)
     elif zoom == "60 días":
-        max_date = base_min + pd.Timedelta(days=60)
+        max_date = min_date + pd.Timedelta(days=60)
 
     data = data[(data["end_date"] >= min_date) & (data["start_date"] <= max_date)]
 
     total_days = max((max_date - min_date).days, 1)
 
-    # meses
+    # ✅ meses
     months = pd.date_range(min_date, max_date, freq="MS")
 
     month_headers = ""
@@ -41,7 +46,7 @@ def build_ms_project_gantt_html(df, zoom="Proyecto completo"):
         next_m = m + pd.offsets.MonthBegin(1)
 
         left = ((m - min_date).days / total_days) * 100
-        width = ((next_m - m).days / total_days) * 100
+        width = max(((next_m - m).days / total_days) * 100, 4)
 
         month_headers += f'''
         <div class="month-header" style="left:{left:.2f}%; width:{width:.2f}%;">
@@ -49,37 +54,63 @@ def build_ms_project_gantt_html(df, zoom="Proyecto completo"):
         </div>
         '''
 
-    # filas
+    # ✅ filas completas (PRO)
     rows_html = ""
+
     for _, row in data.iterrows():
+        level = row["level"]
+        style = LEVEL_STYLES.get(level, LEVEL_STYLES["Subtarea"])
+        color = STATUS_COLORS.get(row["timeline_status"], "#607D8B")
 
         start = max(row["start_date"], min_date)
         end = min(row["end_date"], max_date)
 
         left = ((start - min_date).days / total_days) * 100
-        width = max(((end - start).days / total_days) * 100, 1)
+        width = max(((end - start).days / total_days) * 100, 1.5)
 
-        color = STATUS_COLORS.get(row["timeline_status"], "#607D8B")
+        progress_width = max(min(float(row["progress"]), 100), 0)
 
         rows_html += f'''
         <div class="gantt-row">
 
             <div class="task-table">
-                <div>{row["item_name"]}</div>
-                <div>{row["responsible"]}</div>
+
+                <div class="task-name" style="padding-left:{style["indent"]}px; font-weight:{style["font_weight"]};">
+                    <span class="tree-icon">{style["icon"]}</span>
+                    {escape(str(row["item_name"]))}
+                </div>
+
+                <div>{escape(str(row["responsible"]))}</div>
+
                 <div>{row["start_date"].strftime("%d/%m/%Y")}</div>
+
                 <div>{row["end_date"].strftime("%d/%m/%Y")}</div>
+
                 <div>{int(row["progress"])}%</div>
-                <div>{row["timeline_status"]}</div>
+
+                <div>
+                    <span class="status-pill" style="background:{color};">
+                        {escape(str(row["timeline_status"]))}
+                    </span>
+                </div>
+
                 <div></div>
+
             </div>
 
             <div class="timeline-cell">
-                <div class="bar" style="
-                    left:{left:.2f}%;
-                    width:{width:.2f}%;
-                    background:{color};
-                "></div>
+                <div class="bar"
+                    style="
+                        left:{left:.2f}%;
+                        width:{width:.2f}%;
+                        height:{style["bar_height"]}px;
+                        background:{color};
+                        opacity:{style["opacity"]};
+                    ">
+
+                    <div class="bar-progress" style="width:{progress_width:.2f}%;"></div>
+
+                </div>
             </div>
 
         </div>
@@ -87,50 +118,54 @@ def build_ms_project_gantt_html(df, zoom="Proyecto completo"):
 
     html = f'''
     <style>
+
     .gantt-header {{
         display: grid;
-        grid-template-columns: 700px 1fr;
-        background: #eee;
+        grid-template-columns: 760px 1fr;
+        background: #f3f4f6;
     }}
 
     .table-header {{
         display: grid;
-        grid-template-columns: repeat(7, 1fr);
+        grid-template-columns: 220px 120px 90px 90px 65px 105px 70px;
         font-weight: bold;
     }}
 
     .gantt-row {{
         display: grid;
-        grid-template-columns: 700px 1fr;
-        border-bottom: 1px solid #ddd;
+        grid-template-columns: 760px 1fr;
+        min-height: 38px;
+        align-items: center;
+        border-bottom: 1px solid #e5e7eb;
     }}
 
     .task-table {{
         display: grid;
-        grid-template-columns: repeat(7, 1fr);
+        grid-template-columns: 220px 120px 90px 90px 65px 105px 70px;
         font-size: 12px;
     }}
 
     .task-table > div {{
-        padding: 6px;
+        padding: 6px 8px;
+        border-right: 1px solid #e5e7eb;
     }}
 
-    .timeline-cell {{
-        position: relative;
-        height: 40px;
+    .tree-icon {{
+        display: inline-block;
+        width: 16px;
     }}
 
-    .bar {{
-        position: absolute;
-        top: 10px;
-        height: 18px;
-        border-radius: 4px;
+    .status-pill {{
+        color: white;
+        border-radius: 999px;
+        padding: 3px 8px;
+        font-size: 11px;
+        font-weight: bold;
     }}
 
     .timeline-header {{
         position: relative;
         height: 40px;
-        border-left: 1px solid #ccc;
     }}
 
     .month-header {{
@@ -138,6 +173,24 @@ def build_ms_project_gantt_html(df, zoom="Proyecto completo"):
         font-size: 12px;
         text-align: center;
     }}
+
+    .timeline-cell {{
+        position: relative;
+        height: 38px;
+    }}
+
+    .bar {{
+        position: absolute;
+        top: 50%;
+        transform: translateY(-50%);
+        border-radius: 4px;
+    }}
+
+    .bar-progress {{
+        height: 100%;
+        background: rgba(255,255,255,0.4);
+    }}
+
     </style>
 
     <div>
