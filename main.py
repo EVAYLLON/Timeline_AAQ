@@ -15,17 +15,12 @@ BASE_DIR = Path(__file__).resolve().parent
 JSON_PATH = BASE_DIR / "config" / "tasks.json"
 REPORT_PATH = BASE_DIR / "reports" / "gantt.html"
 
-st.set_page_config(
-    page_title="Project Tracker",
-    page_icon="📊",
-    layout="wide"
-)
-
+st.set_page_config(layout="wide")
 st.title("Project Tracker")
 
-# ======================
+# =====================
 # LOAD
-# ======================
+# =====================
 @st.cache_data(show_spinner=False)
 def cached_load(path: str):
     return flatten_tasks(load_tasks(path))
@@ -39,27 +34,22 @@ def reload_data():
 if "df" not in st.session_state:
     reload_data()
 
-
-# ======================
-# STATUS AUTOMÁTICO ✅
-# ======================
+# =====================
+# STATUS
+# =====================
 def calcular_estado(avance):
-    try:
-        avance = float(avance)
-    except:
-        return "No iniciado"
+    avance = float(avance) if pd.notnull(avance) else 0
 
     if avance >= 100:
         return "Completado"
-    elif avance <= 0:
+    elif avance == 0:
         return "No iniciado"
     else:
         return "En curso"
 
-
-# ======================
-# CLEAN DATA
-# ======================
+# =====================
+# DATA CLEAN
+# =====================
 df = st.session_state["df"].copy()
 
 df["start_date"] = pd.to_datetime(df["start_date"], errors="coerce")
@@ -73,19 +63,19 @@ for col in [
 ]:
     df[col] = df[col].fillna("").astype(str)
 
-df = df.fillna("")
-
-# ✅ recalcular SIEMPRE el status
 df["status"] = df["progress"].apply(calcular_estado)
 
-# ======================
-# DATA EDITOR
-# ======================
+# =====================
+# REMOVE INTERNAL
+# =====================
 df_display = df.drop(
     columns=["item_id", "parent_id", "level_order"],
     errors="ignore"
 )
 
+# =====================
+# EDITOR
+# =====================
 edited_df = st.data_editor(
     df_display,
     use_container_width=True,
@@ -93,85 +83,78 @@ edited_df = st.data_editor(
     column_config={
         "level": st.column_config.SelectboxColumn(
             "Nivel",
-            options=["Proyecto", "Tarea", "Subtarea"],
-            required=True
+            options=["Proyecto", "Tarea", "Subtarea"]
         ),
-        "project_id": "ID Proyecto",
-        "project_name": "Nombre Proyecto",
-        "item_name": "Nombre Item",
-        "responsible": "Responsable",
-        "start_date": "Fecha inicio",
-        "end_date": "Fecha fin",
-        "progress": "Avance %",
-        "status": st.column_config.TextColumn("Estado", disabled=True),  # ✅ SOLO LECTURA
-        "timeline_status": "Estado plazo",
-        "document_url": "Documento"
+        "status": st.column_config.TextColumn("Estado", disabled=True)
     },
     disabled=["status"],
     key="editor"
 )
 
-# ======================
-# RECONSTRUCT DF
-# ======================
+# =====================
+# RECONSTRUCT
+# =====================
 full_df = edited_df.copy()
 
 full_df["start_date"] = pd.to_datetime(full_df["start_date"], errors="coerce")
 full_df["end_date"] = pd.to_datetime(full_df["end_date"], errors="coerce")
 full_df["progress"] = pd.to_numeric(full_df["progress"], errors="coerce").fillna(0)
 
-# ✅ status SIEMPRE automático
+# ✅ STATUS SIEMPRE AUTOMÁTICO
 full_df["status"] = full_df["progress"].apply(calcular_estado)
 
-# ✅ nivel automático
+# ✅ LEVEL
 mapping = {"Proyecto": 0, "Tarea": 1, "Subtarea": 2}
-full_df["level_order"] = full_df["level"].map(mapping).fillna(2).astype(int)
+full_df["level_order"] = full_df["level"].map(mapping).fillna(2)
 
-# internos
-full_df["item_id"] = range(1, len(full_df) + 1)
+# ✅ PRESERVAR IDs (CLAVE)
+if "item_id" in df.columns and len(df) == len(full_df):
+    full_df["item_id"] = df["item_id"]
+else:
+    full_df["item_id"] = range(1, len(full_df) + 1)
+
 full_df["parent_id"] = ""
 
-
-# ======================
-# BUTTONS
-# ======================
+# =====================
+# BOTONES
+# =====================
 col1, col2, col3 = st.columns(3)
 
 with col1:
     if st.button("Guardar JSON"):
-        save_tasks(dataframe_to_nested_json(full_df), JSON_PATH)
+        save_tasks(
+            dataframe_to_nested_json(full_df),
+            JSON_PATH
+        )
         reload_data()
         st.success("Guardado ✅")
 
 with col2:
     if st.button("Actualizar Gantt"):
-        st.session_state["df"] = flatten_tasks(
-            dataframe_to_nested_json(full_df)
+        # ✅ AUTOGUARDAR ANTES DE ACTUALIZAR
+        save_tasks(
+            dataframe_to_nested_json(full_df),
+            JSON_PATH
         )
+        reload_data()
         st.success("Actualizado ✅")
 
 with col3:
     if st.button("Exportar HTML"):
         html = build_ms_project_gantt_html(full_df)
         export_gantt_html(html, REPORT_PATH)
-        st.success(f"Exportado ✅")
+        st.success("Exportado ✅")
 
-
-# ======================
-# KPIs
-# ======================
+# =====================
+# METRICS
+# =====================
 st.markdown("---")
 
-k1, k2, k3 = st.columns(3)
+st.metric("Total", len(full_df))
 
-k1.metric("Total", len(full_df))
-k2.metric("Completados", (full_df["status"] == "Completado").sum())
-k3.metric("En curso", (full_df["status"] == "En curso").sum())
-
-
-# ======================
+# =====================
 # GANTT
-# ======================
+# =====================
 zoom = st.selectbox("Zoom", ["Proyecto completo", "30 días", "60 días"])
 
 html = build_ms_project_gantt_html(full_df, zoom=zoom)
