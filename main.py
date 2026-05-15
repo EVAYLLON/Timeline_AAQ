@@ -213,7 +213,7 @@ st.subheader("Gantt jerárquico tipo Microsoft Project")
 html = build_ms_project_gantt_html(current_df, zoom=zoom)
 num_rows = len(current_df)
 height = max(400, 40 * num_rows)
-components.html(html, height=height, scrolling=True)
+components.html(html, height=600, scrolling=True)
 
 
 st.subheader("Referencias documentales")
