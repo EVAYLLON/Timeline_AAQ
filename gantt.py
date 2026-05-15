@@ -151,6 +151,7 @@ def build_ms_project_gantt_html(
 
     html = f'''
     <!DOCTYPE html>
+    <html>
     <head>
     <meta charset="utf-8">
 
@@ -251,7 +252,7 @@ def build_ms_project_gantt_html(
     </body>
     </html>
     '''
-
+    return html
 
 def export_gantt_html(html: str, output_path: str | Path = "reports/gantt.html") -> Path:
     output_path = Path(output_path)
