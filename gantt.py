@@ -156,49 +156,62 @@ def build_ms_project_gantt_html(
     <meta charset="utf-8">
 
     <style>
+    /* 👇 PEGA EL NUEVO CSS AQUÍ */
+
     body {{
         font-family: Arial, Helvetica, sans-serif;
+        background: #ffffff;
+        color: #1f2937;
     }}
 
     .gantt-wrapper {{
-        border: 1px solid #ccc;
+        border: 1px solid #d1d5db;
         border-radius: 8px;
         overflow: auto;
+        background: #ffffff;
     }}
 
     .gantt-header {{
         display: grid;
-        grid-template-columns: 740px 1fr;
+        grid-template-columns: 740px minmax(900px, 1fr);
+        background: #f3f4f6;
     }}
 
     .table-header {{
         display: grid;
         grid-template-columns: 220px 120px 90px 90px 65px 105px 70px;
+        font-weight: 700;
     }}
 
     .table-header div {{
-        padding: 8px;
-        border-right: 1px solid #ccc;
+        padding: 10px 8px;
+        border-right: 1px solid #d1d5db;
     }}
 
     .timeline-header {{
         position: relative;
-        height: 40px;
-        border-left: 1px solid #ccc;
+        height: 38px;
+        border-left: 1px solid #d1d5db;
+        background: repeating-linear-gradient(
+            to right,
+            #f9fafb 0px,
+            #f9fafb 79px,
+            #e5e7eb 80px
+        );
     }}
 
     .month-header {{
         position: absolute;
-        height: 40px;
-        text-align: center;
+        height: 38px;
+        padding: 10px 4px;
         font-size: 12px;
-        border-right: 1px solid #ccc;
-        background: #e5e7eb;
+        font-weight: 700;
+        border-right: 1px solid #d1d5db;
     }}
 
     .gantt-row {{
         display: grid;
-        grid-template-columns: 740px 1fr;
+        grid-template-columns: 740px minmax(900px, 1fr);
     }}
 
     .task-table {{
@@ -207,13 +220,12 @@ def build_ms_project_gantt_html(
     }}
 
     .task-table > div {{
-        padding: 6px;
-        border-right: 1px solid #ddd;
+        padding: 7px 8px;
+        border-right: 1px solid #e5e7eb;
     }}
 
     .timeline-cell {{
         position: relative;
-        border-left: 1px solid #ccc;
     }}
 
     .bar {{
@@ -221,35 +233,12 @@ def build_ms_project_gantt_html(
         top: 50%;
         transform: translateY(-50%);
         border-radius: 4px;
-        height: 16px;
     }}
     </style>
 
     </head>
-
     <body>
 
-    <div class="gantt-wrapper">
-        <div class="gantt-header">
-            <div class="table-header">
-                <div>Proyecto / Tarea</div>
-                <div>Responsable</div>
-                <div>Inicio</div>
-                <div>Fin</div>
-                <div>Avance</div>
-                <div>Estado</div>
-                <div>Link</div>
-            </div>
-            <div class="timeline-header">
-                {month_headers}
-            </div>
-        </div>
-
-        {rows_html}
-
-    </div>
-
-    </body>
     </html>
     '''
     return html
