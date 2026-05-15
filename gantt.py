@@ -17,10 +17,17 @@ LEVEL_STYLES = {
 }
 
 
-def _date_range_months(start_date, end_date):
-    start = pd.to_datetime(start_date).replace(day=1)
-    end = pd.to_datetime(end_date).replace(day=1)
-    return pd.date_range(start=start, end=end, freq="MS")
+
+def _date_range_months(start, end):
+    months = []
+    current = start.replace(day=1)
+
+    while current <= end:
+        months.append(current)
+        current = (current + pd.DateOffset(months=1)).replace(day=1)
+
+    return months
+
 
 
 def _safe_link(url: str) -> str:
@@ -64,6 +71,9 @@ def build_ms_project_gantt_html(df: pd.DataFrame, title: str = "Gantt de Seguimi
         data = data[data["end_date"] >= min_date]
 
         months = _date_range_months(min_date, max_date)
+        if not months:
+            months = [min_date]
+
 
     month_headers = ""
     for m in months:
