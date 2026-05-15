@@ -118,67 +118,18 @@ def build_ms_project_gantt_html(df, zoom="Proyecto completo"):
 
     html = f'''
     <style>
-
-    .gantt-wrapper {
+    .gantt-wrapper {{
         border: 1px solid #d1d5db;
-        border-radius: 6px;
-        overflow: auto;
-        background: #ffffff;
-    }
-
-    /* HEADER */
-    .gantt-header {
-        display: grid;
-        grid-template-columns: 760px 1fr;
-        background: #f3f4f6;
-    }
-
-    .table-header {
-        display: grid;
-        grid-template-columns: 220px 120px 90px 90px 65px 105px 70px;
-        font-weight: bold;
-        font-size: 13px;
-    }
-
-    .table-header div {
-        padding: 10px 8px;
-        border-right: 1px solid #d1d5db;
-    }
-
-    /* FILAS */
+    }}
 
     .gantt-row {{
         display: grid;
     }}
-
-        display: grid;
-        grid-template-columns: 760px 1fr;
-        min-height: 38px;
-        align-items: center;
-
-
     </style>
 
-    <div>
-
-        <div class="gantt-header">
-            <div class="table-header">
-                <div>Proyecto</div>
-                <div>Responsable</div>
-                <div>Inicio</div>
-                <div>Fin</div>
-                <div>Avance</div>
-                <div>Estado</div>
-                <div>Link</div>
-            </div>
-
-            <div class="timeline-header">
-                {month_headers}
-            </div>
-        </div>
-
+    <div class="gantt-wrapper">
+        {month_headers}
         {rows_html}
-
     </div>
     '''
 
