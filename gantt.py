@@ -41,18 +41,17 @@ def build_ms_project_gantt_html(df: pd.DataFrame, title: str = "Gantt de Seguimi
     base_min = data["start_date"].min()
     base_max = data["end_date"].max()
 
-    # --- APLICAR ZOOM ---
+    # DEFAULT
+    min_date = base_min
+    max_date = base_max
+
+    # APPLY ZOOM
     if zoom == "30 días":
-        min_date = base_min
         max_date = base_min + pd.Timedelta(days=30)
 
     elif zoom == "60 días":
-        min_date = base_min
         max_date = base_min + pd.Timedelta(days=60)
 
-    else:
-        min_date = base_min
-        max_date = base_max
 
 # Recortar tareas al rango visible
         data = data[data["end_date"] >= min_date]
