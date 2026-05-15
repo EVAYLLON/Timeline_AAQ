@@ -111,6 +111,8 @@ df = df.fillna("")
 df["progress"] = pd.to_numeric(df["progress"], errors="coerce").fillna(0)
 
 df_display = df.drop(columns=["item_id", "parent_id"], errors="ignore")
+df_display["status"] = df_display["progress"].apply(calcular_estado)
+
 
 
 edited_df = st.data_editor(
