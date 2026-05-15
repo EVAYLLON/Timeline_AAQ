@@ -29,7 +29,6 @@ def build_ms_project_gantt_html(df, zoom="Proyecto completo"):
         return "<p>No existen datos</p>"
 
     data = df.copy()
-
     data["start_date"] = pd.to_datetime(data["start_date"])
     data["end_date"] = pd.to_datetime(data["end_date"])
 
@@ -46,7 +45,7 @@ def build_ms_project_gantt_html(df, zoom="Proyecto completo"):
     total_days = max((max_date - min_date).days, 1)
     today = datetime.today()
 
-    # ===== HEADER MESES =====
+    # ===== MESES =====
     months = pd.date_range(min_date, max_date, freq="MS")
     month_headers = ""
 
@@ -65,16 +64,21 @@ def build_ms_project_gantt_html(df, zoom="Proyecto completo"):
     # ===== DÍAS =====
     day_headers = ""
     for i in range(total_days + 1):
-        day_date = min_date + pd.Timedelta(days=i)
-        left = (i / total_days) * 100
+        d = min_date + pd.Timedelta(days=i)
+
+        # ✅ centrado perfecto en la celda
+        left = ((i + 0.5) / total_days) * 100
+
+        is_today = d.date() == today.date()
+        cls = "day-label day-today" if is_today else "day-label"
 
         day_headers += f'''
-        <div class="day-label" style="left:{left:.2f}%;">
-            {day_date.day}
+        <div class="{cls}" style="left:{left:.2f}%;">
+            {d.day}
         </div>
         '''
 
-    # línea HOY
+    # ===== línea HOY =====
     today_pos = ((today - min_date).days / total_days) * 100
 
     # ===== FILAS =====
@@ -131,12 +135,13 @@ def build_ms_project_gantt_html(df, zoom="Proyecto completo"):
         </div>
         '''
 
-    # ===== HTML FINAL =====
     html = f'''
 <style>
 
+/* ✅ TIPOGRAFÍA EXACTA */
 .gantt-wrapper {{
-    font-family: "Segoe UI", Arial, sans-serif;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI",
+                 Roboto, Helvetica, Arial, sans-serif;
     border: 1px solid #ccc;
 }}
 
@@ -172,19 +177,14 @@ def build_ms_project_gantt_html(df, zoom="Proyecto completo"):
 
 .timeline-header {{
     position: relative;
-    height: 50px;
-}}
-
-.day-label {{
-    position: absolute;
-    top: 20px;
-    font-size: 10px;
-    color: #888;
+    height: 45px;
 }}
 
 .timeline-cell {{
     position: relative;
     height: 32px;
+
+    /* ✅ grid de días */
     background: repeating-linear-gradient(
         to right,
         #ffffff 0px,
@@ -199,6 +199,19 @@ def build_ms_project_gantt_html(df, zoom="Proyecto completo"):
     font-size: 11px;
     font-weight: 600;
     text-align: center;
+}}
+
+.day-label {{
+    position: absolute;
+    bottom: 2px;                     /* ✅ clave */
+    transform: translateX(-50%);
+    font-size: 11px;
+    color: #4b5563;
+}}
+
+.day-today {{
+    color: red;
+    font-weight: bold;
 }}
 
 .bar {{
@@ -268,4 +281,3 @@ def export_gantt_html(html, output_path="reports/gantt.html"):
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(html, encoding="utf-8")
     return path
-``
