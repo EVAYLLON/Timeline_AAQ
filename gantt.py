@@ -149,109 +149,108 @@ def build_ms_project_gantt_html(
     # HTML ORIGINAL (LIMPIO)
     # =========================
 
-html = f'''
-<!DOCTYPE html>
-<html>
-<head>
-<meta charset="utf-8">
+    html = f'''
+    <!DOCTYPE html>
+    <head>
+    <meta charset="utf-8">
 
-<style>
-body {{
-    font-family: Arial, Helvetica, sans-serif;
-}}
+    <style>
+    body {{
+        font-family: Arial, Helvetica, sans-serif;
+    }}
 
-.gantt-wrapper {{
-    border: 1px solid #ccc;
-    border-radius: 8px;
-    overflow: auto;
-}}
+    .gantt-wrapper {{
+        border: 1px solid #ccc;
+        border-radius: 8px;
+        overflow: auto;
+    }}
 
-.gantt-header {{
-    display: grid;
-    grid-template-columns: 740px 1fr;
-}}
+    .gantt-header {{
+        display: grid;
+        grid-template-columns: 740px 1fr;
+    }}
 
-.table-header {{
-    display: grid;
-    grid-template-columns: 220px 120px 90px 90px 65px 105px 70px;
-}}
+    .table-header {{
+        display: grid;
+        grid-template-columns: 220px 120px 90px 90px 65px 105px 70px;
+    }}
 
-.table-header div {{
-    padding: 8px;
-    border-right: 1px solid #ccc;
-}}
+    .table-header div {{
+        padding: 8px;
+        border-right: 1px solid #ccc;
+    }}
 
-.timeline-header {{
-    position: relative;
-    height: 40px;
-    border-left: 1px solid #ccc;
-}}
+    .timeline-header {{
+        position: relative;
+        height: 40px;
+        border-left: 1px solid #ccc;
+    }}
 
-.month-header {{
-    position: absolute;
-    height: 40px;
-    text-align: center;
-    font-size: 12px;
-    border-right: 1px solid #ccc;
-    background: #e5e7eb;
-}}
+    .month-header {{
+        position: absolute;
+        height: 40px;
+        text-align: center;
+        font-size: 12px;
+        border-right: 1px solid #ccc;
+        background: #e5e7eb;
+    }}
 
-.gantt-row {{
-    display: grid;
-    grid-template-columns: 740px 1fr;
-}}
+    .gantt-row {{
+        display: grid;
+        grid-template-columns: 740px 1fr;
+    }}
 
-.task-table {{
-    display: grid;
-    grid-template-columns: 220px 120px 90px 90px 65px 105px 70px;
-}}
+    .task-table {{
+        display: grid;
+        grid-template-columns: 220px 120px 90px 90px 65px 105px 70px;
+    }}
 
-.task-table > div {{
-    padding: 6px;
-    border-right: 1px solid #ddd;
-}}
+    .task-table > div {{
+        padding: 6px;
+        border-right: 1px solid #ddd;
+    }}
 
-.timeline-cell {{
-    position: relative;
-    border-left: 1px solid #ccc;
-}}
+    .timeline-cell {{
+        position: relative;
+        border-left: 1px solid #ccc;
+    }}
 
-.bar {{
-    position: absolute;
-    top: 50%;
-    transform: translateY(-50%);
-    border-radius: 4px;
-    height: 16px;
-}}
-</style>
+    .bar {{
+        position: absolute;
+        top: 50%;
+        transform: translateY(-50%);
+        border-radius: 4px;
+        height: 16px;
+    }}
+    </style>
 
-</head>
+    </head>
 
-<body>
+    <body>
 
-<div class="gantt-wrapper">
-    <div class="gantt-header">
-        <div class="table-header">
-            <div>Proyecto / Tarea</div>
-            <div>Responsable</div>
-            <div>Inicio</div>
-            <div>Fin</div>
-            <div>Avance</div>
-            <div>Estado</div>
-            <div>Link</div>
+    <div class="gantt-wrapper">
+        <div class="gantt-header">
+            <div class="table-header">
+                <div>Proyecto / Tarea</div>
+                <div>Responsable</div>
+                <div>Inicio</div>
+                <div>Fin</div>
+                <div>Avance</div>
+                <div>Estado</div>
+                <div>Link</div>
+            </div>
+            <div class="timeline-header">
+                {month_headers}
+            </div>
         </div>
-        <div class="timeline-header">
-            {month_headers}
-        </div>
+
+        {rows_html}
+
     </div>
 
-    {rows_html}
-
-</div>
-
-</body>
-</html>
-'''
+    </body>
+    </html>
+    '''
 
 
 def export_gantt_html(html: str, output_path: str | Path = "reports/gantt.html") -> Path:
