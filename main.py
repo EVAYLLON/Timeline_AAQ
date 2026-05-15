@@ -62,6 +62,13 @@ with st.sidebar:
     st.info("Edita la tabla, guarda cambios y actualiza el Gantt.")
 
 
+def calcular_estado(avance):
+    if avance >= 100:
+        return "Completado"
+    elif avance == 0:
+        return "No iniciado"
+    else:
+        return "En curso"
 
 df = st.session_state["df"].copy()
 
@@ -129,11 +136,10 @@ edited_df = st.data_editor(
             max_value=100,
             step=5
         ),
-        "status": st.column_config.SelectboxColumn(
+        "status": st.column_config.TextColumn(
             "Estado operativo",
-            options=["No iniciado", "En curso", "Completado", "Bloqueado"],
-            required=True
-        ),
+            disabled=True
+        )
         "timeline_status": st.column_config.TextColumn(
             "Estado plazo",
             disabled=True
@@ -153,6 +159,7 @@ edited_df = st.data_editor(
 full_df = df.copy()
 full_df.update(edited_df)
 
+full_df["status"] = full_df["progress"].apply(calcular_estado)
 
 col1, col2, col3 = st.columns(3)
 
@@ -201,7 +208,7 @@ zoom = st.selectbox(
 
 st.subheader("Gantt jerárquico tipo Microsoft Project")
 
-html = build_ms_project_gantt_html(current_df)
+html = build_ms_project_gantt_html(current_df, zoom=zoom)
 num_rows = len(current_df)
 height = max(400, 40 * num_rows)
 components.html(html, height=height, scrolling=True)
