@@ -22,7 +22,7 @@ st.set_page_config(layout="wide")
 st.title("Project Tracker (Jerarquía real)")
 
 # ======================
-# LOAD DATA
+# LOAD
 # ======================
 @st.cache_data(show_spinner=False)
 def cached_load(path):
@@ -35,28 +35,45 @@ def reload_data():
 if "df" not in st.session_state:
     reload_data()
 
-
 # ======================
 # FUNCIONES
 # ======================
 def calcular_estado(x):
-    try: x = float(x)
-    except: x = 0
+    try:
+        x = float(x)
+    except:
+        x = 0
 
-    if x >= 100: return "Completado"
-    if x <= 0: return "No iniciado"
-    return "En curso"
+    if x >= 100:
+        return "Completado"
+    elif x <= 0:
+        return "No iniciado"
+    else:
+        return "En curso"
 
 
 def calcular_timeline(row):
     today = pd.Timestamp.today().normalize()
-    end = row["end_date"]
 
-    if pd.isna(end): return ""
+    # 🔥 FORZAR lectura correcta de progress
+    progress = pd.to_numeric(row.get("progress", 0), errors="coerce")
+    progress = 0 if pd.isna(progress) else progress
 
-    if end < today: return "Vencido"
-    elif (end - today).days <= 5: return "En riesgo"
-    return "En plazo"
+    # ✅ PRIORIDAD ABSOLUTA
+    if progress >= 100:
+        return "Sin riesgo"
+
+    end = pd.to_datetime(row.get("end_date"), errors="coerce")
+
+    if pd.isna(end):
+        return ""
+
+    if end < today:
+        return "Vencido"
+    elif (end - today).days <= 5:
+        return "En riesgo"
+    else:
+        return "En plazo"
 
 
 # ======================
@@ -71,15 +88,21 @@ df["progress"] = pd.to_numeric(df["progress"], errors="coerce").fillna(0)
 for col in ["level", "project_name", "item_name", "responsible"]:
     df[col] = df[col].fillna("").astype(str)
 
+# 🔥 CLAVE: BORRAR estado antiguo
+df["status"] = ""
+df["timeline_status"] = ""
+
+# ✅ recalcular limpio SIEMPRE
 df["status"] = df["progress"].apply(calcular_estado)
 df["timeline_status"] = df.apply(calcular_timeline, axis=1)
 
+# quitar hora
 df["start_date"] = df["start_date"].dt.date
 df["end_date"] = df["end_date"].dt.date
 
 
 # ======================
-# UI SIN CAMPOS TECNICOS
+# UI
 # ======================
 df_display = df.drop(
     columns=["item_id", "parent_id", "project_id", "level_order"],
@@ -93,14 +116,20 @@ edited_df = st.data_editor(
     column_config={
         "level": st.column_config.SelectboxColumn(
             "Nivel",
-            options=["Proyecto", "Tarea", "Subtarea"],
-            required=True
+            options=["Proyecto", "Tarea", "Subtarea"]
         ),
         "status": st.column_config.TextColumn("Estado", disabled=True),
         "timeline_status": st.column_config.TextColumn("Estado plazo", disabled=True)
     },
     disabled=["status", "timeline_status"]
 )
+
+# 🔥 FIX DEFINITIVO
+edited_df["progress"] = pd.to_numeric(edited_df["progress"], errors="coerce").fillna(0)
+
+edited_df["status"] = edited_df["progress"].apply(calcular_estado)
+edited_df["timeline_status"] = edited_df.apply(calcular_timeline, axis=1)
+
 
 # ======================
 # RECONSTRUCCION
@@ -109,47 +138,43 @@ full_df = edited_df.copy()
 
 full_df["start_date"] = pd.to_datetime(full_df["start_date"], errors="coerce")
 full_df["end_date"] = pd.to_datetime(full_df["end_date"], errors="coerce")
+
 full_df["progress"] = pd.to_numeric(full_df["progress"], errors="coerce").fillna(0)
 
+# 🔥 DOBLE SEGURIDAD
 full_df["status"] = full_df["progress"].apply(calcular_estado)
 full_df["timeline_status"] = full_df.apply(calcular_timeline, axis=1)
 
+
 # ======================
-# LEVEL ORDER
+# JERARQUIA
 # ======================
 level_map = {"Proyecto": 0, "Tarea": 1, "Subtarea": 2}
 full_df["level_order"] = full_df["level"].map(level_map).fillna(2)
 
-# ======================
-# 🔥 JERARQUIA REAL
-# ======================
 full_df["item_id"] = range(1, len(full_df) + 1)
 
-current_project_id = None
-current_task_id = None
+current_project = None
+current_task = None
+parents = []
 
-parent_ids = []
-
-for idx, row in full_df.iterrows():
-
-    if row["level"] == "Proyecto":
-        current_project_id = row["item_id"]
-        parent_ids.append("")
-
-    elif row["level"] == "Tarea":
-        parent_ids.append(current_project_id)
-        current_task_id = row["item_id"]
-
-    elif row["level"] == "Subtarea":
-        parent_ids.append(current_task_id)
-
+for _, r in full_df.iterrows():
+    if r["level"] == "Proyecto":
+        current_project = r["item_id"]
+        parents.append("")
+    elif r["level"] == "Tarea":
+        parents.append(current_project)
+        current_task = r["item_id"]
+    elif r["level"] == "Subtarea":
+        parents.append(current_task)
     else:
-        parent_ids.append("")
+        parents.append("")
 
-full_df["parent_id"] = parent_ids
+full_df["parent_id"] = parents
+
 
 # ======================
-# PROJECT_ID POR GRUPO
+# PROJECT ID
 # ======================
 project_map = {}
 counter = 1
@@ -165,62 +190,22 @@ for i in full_df.index:
 
 
 # ======================
-# VALIDACION
-# ======================
-def validar(df):
-    return df[
-        (df["item_name"] == "") |
-        (df["start_date"].isna()) |
-        (df["end_date"].isna())
-    ]
-
-
-# ======================
 # BOTONES
 # ======================
-col1, col2, col3 = st.columns(3)
+if st.button("Guardar JSON"):
+    save_tasks(dataframe_to_nested_json(full_df), JSON_PATH)
+    reload_data()
+    st.success("Guardado ✅")
 
-with col1:
-    if st.button("Guardar JSON"):
-        invalid = validar(full_df)
+if st.button("Actualizar Gantt"):
+    save_tasks(dataframe_to_nested_json(full_df), JSON_PATH)
+    reload_data()
+    st.success("Actualizado ✅")
 
-        if not invalid.empty:
-            st.error("Completa todos los campos obligatorios")
-        else:
-            save_tasks(dataframe_to_nested_json(full_df), JSON_PATH)
-            reload_data()
-            st.success("Guardado ✅")
-
-with col2:
-    if st.button("Actualizar Gantt"):
-        invalid = validar(full_df)
-
-        if not invalid.empty:
-            st.error("Datos incompletos")
-        else:
-            save_tasks(dataframe_to_nested_json(full_df), JSON_PATH)
-            reload_data()
-            st.success("Actualizado ✅")
-
-with col3:
-    if st.button("Exportar HTML"):
-        html = build_ms_project_gantt_html(full_df)
-        export_gantt_html(html, REPORT_PATH)
-        st.success("Exportado ✅")
-
-
-# ======================
-# KPI
-# ======================
-st.markdown("---")
-
-k1, k2, k3, k4 = st.columns(4)
-
-k1.metric("Total", len(full_df))
-k2.metric("Completados", (full_df["status"] == "Completado").sum())
-k3.metric("En curso", (full_df["status"] == "En curso").sum())
-k4.metric("Vencidos", (full_df["timeline_status"] == "Vencido").sum())
-
+if st.button("Exportar HTML"):
+    html = build_ms_project_gantt_html(full_df)
+    export_gantt_html(html, REPORT_PATH)
+    st.success("Exportado ✅")
 
 # ======================
 # GANTT
