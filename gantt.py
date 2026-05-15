@@ -122,9 +122,15 @@ def build_ms_project_gantt_html(df, zoom="Proyecto completo"):
         border: 1px solid #d1d5db;
     }}
 
+
     .gantt-row {{
         display: grid;
     }}
+
+    .table-header {{
+        display: grid;
+    }}
+
     </style>
 
     <div class="gantt-wrapper">
