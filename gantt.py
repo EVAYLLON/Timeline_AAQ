@@ -35,82 +35,67 @@ def _safe_link(url: str) -> str:
         return f'<a href="{escape(url)}" target="_blank">Abrir</a>'
     return ""
 
+def build_ms_project_gantt_html(
+    df: pd.DataFrame,
+    title: str = "Gantt de Seguimiento",
+    zoom: str = "Proyecto completo"
+) -> str:
 
-def build_ms_project_gantt_html(df: pd.DataFrame, title: str = "Gantt de Seguimiento", zoom: str = "Proyecto completo") -> str:
     if df.empty:
         return "<p>No existen datos para construir el Gantt.</p>"
 
     data = df.copy()
-# --- DEFINIR RANGO BASE ---
-# --- NORMALIZAR FECHAS ---
+
+    # =========================
+    # ✅ BLOQUE LIMPIO (ÚNICO)
+    # =========================
     data["start_date"] = pd.to_datetime(data["start_date"])
     data["end_date"] = pd.to_datetime(data["end_date"])
 
     base_min = data["start_date"].min()
     base_max = data["end_date"].max()
 
-    # --- RANGO INICIAL ---
     min_date = base_min
     max_date = base_max
 
-    # --- ZOOM ---
+    # ✅ ZOOM
     if zoom == "30 días":
         max_date = base_min + pd.Timedelta(days=30)
-
     elif zoom == "60 días":
         max_date = base_min + pd.Timedelta(days=60)
 
-    # --- VALIDACIÓN ---
-    if pd.isna(min_date) or pd.isna(max_date):
-        min_date = base_min
-        max_date = base_max
+    # ✅ RECORTE
+    data = data[
+        (data["end_date"] >= min_date) &
+        (data["start_date"] <= max_date)
+    ]
 
-    # --- RECORTE (SIEMPRE) ---
-    data = data[data["end_date"] >= min_date]
-    data = data[data["start_date"] <= max_date]
-
-    # --- RANGO ---
+    # ✅ RANGO
     total_days = max((max_date - min_date).days, 1)
 
-    # ✅ ESTA LÍNEA TE FALTABA (CRÍTICA)
     months = _date_range_months(min_date, max_date)
-
-    # fallback por seguridad
     if not months:
         months = [min_date]
 
-    # --- GENERAR MESES (CLAVE) ---
-    months = _date_range_months(min_date, max_date)
-
-    # fallback (evita crash)
-    if not months:
-        months = [min_date]
-
-
-
-
-# Recortar tareas al rango visible
-        data = data[data["end_date"] >= min_date]
-        data = data[data["start_date"] <= max_date]
-
-
-        total_days = max((max_date - min_date).days, 1)
-        # FILTRAR datos dentro del rango visible
-        data = data[data["start_date"] <= max_date]
-        data = data[data["end_date"] >= min_date]
-
-
+    # =========================
+    # HEADER MESES
+    # =========================
     month_headers = ""
     for m in months:
         next_m = m + pd.offsets.MonthBegin(1)
+
         left = ((m - min_date).days / total_days) * 100
         width = max(((next_m - m).days / total_days) * 100, 4)
+
         month_headers += f'''
         <div class="month-header" style="left:{left:.2f}%; width:{width:.2f}%;">
             {m.strftime("%b %Y")}
         </div>
         '''
 
+    # =========================
+    # FILAS
+    # =========================
     rows_html = ""
 
     for _, row in data.iterrows():
@@ -146,7 +131,7 @@ def build_ms_project_gantt_html(df: pd.DataFrame, title: str = "Gantt de Seguimi
 
             <div class="timeline-cell">
                 <div class="bar"
-                     title="{escape(str(row['item_name']))} | {escape(str(row['timeline_status']))} | {int(row['progress'])}%"
+                     title="{escape(str(row['item_name']))}"
                      style="
                         left:{left:.2f}%;
                         width:{width:.2f}%;
@@ -160,6 +145,9 @@ def build_ms_project_gantt_html(df: pd.DataFrame, title: str = "Gantt de Seguimi
         </div>
         '''
 
+    # =========================
+    # HTML ORIGINAL (LIMPIO)
+    # =========================
     html = f'''
     <!DOCTYPE html>
     <html>
@@ -177,17 +165,17 @@ def build_ms_project_gantt_html(df: pd.DataFrame, title: str = "Gantt de Seguimi
         overflow: auto;
     }}
 
-    .gantt-header {{
+    .gantt-header {
         display: grid;
-        grid-template-columns: 700px 1fr;
-        background: #f3f4f6;
-    }}
+        grid-template-columns: 740px 1fr;
+    }
 
-    .table-header {{
+
+    .table-header {
         display: grid;
-        grid-template-columns: repeat(7, 1fr);
-        font-weight: bold;
-    }}
+        grid-template-columns: 220px 120px 90px 90px 65px 105px 70px;
+    }
+
 
     .table-header div {{
         padding: 8px;
@@ -209,15 +197,16 @@ def build_ms_project_gantt_html(df: pd.DataFrame, title: str = "Gantt de Seguimi
         background: #e5e7eb;
     }}
 
-    .gantt-row {{
+    .gantt-row {
         display: grid;
-        grid-template-columns: 700px 1fr;
-    }}
+        grid-template-columns: 740px 1fr;
+    }
 
-    .task-table {{
+
+    .task-table {
         display: grid;
-        grid-template-columns: repeat(7, 1fr);
-    }}
+        grid-template-columns: 220px 120px 90px 90px 65px 105px 70px;
+    }
 
     .task-table div {{
         padding: 6px;
@@ -233,8 +222,8 @@ def build_ms_project_gantt_html(df: pd.DataFrame, title: str = "Gantt de Seguimi
         position: absolute;
         top: 50%;
         transform: translateY(-50%);
-        height: 16px;
         border-radius: 4px;
+        height: 16px;
     }}
     </style>
 
@@ -266,9 +255,7 @@ def build_ms_project_gantt_html(df: pd.DataFrame, title: str = "Gantt de Seguimi
     </html>
     '''
 
-    
     return html
-
 
 def export_gantt_html(html: str, output_path: str | Path = "reports/gantt.html") -> Path:
     output_path = Path(output_path)
