@@ -146,7 +146,11 @@ def build_ms_project_gantt_html(df, zoom="Proyecto completo"):
     }
 
     /* FILAS */
-    .gantt-row {
+
+    .gantt-row {{
+        display: grid;
+    }}
+
         display: grid;
         grid-template-columns: 760px 1fr;
         min-height: 38px;
