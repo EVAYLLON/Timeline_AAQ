@@ -80,13 +80,12 @@ def calcular_estado(x):
 def calcular_timeline(row):
     today = pd.Timestamp.today().normalize()
 
-    # 🔥 FORZAR lectura correcta de progress
     progress = pd.to_numeric(row.get("progress", 0), errors="coerce")
     progress = 0 if pd.isna(progress) else progress
 
-    # ✅ PRIORIDAD ABSOLUTA
+    # ✅ PRIORIDAD
     if progress >= 100:
-        return "Sin riesgo"
+        return "Completado"
 
     end = pd.to_datetime(row.get("end_date"), errors="coerce")
 
@@ -113,11 +112,10 @@ for col in ["nivel", "project_name", "item_name", "responsible"]:
     df[col] = df[col].fillna("").astype(str)
 
 # 🔥 CLAVE: BORRAR estado antiguo
-df["status"] = ""
 df["timeline_status"] = ""
 
 # ✅ recalcular limpio SIEMPRE
-df["status"] = df["progress"].apply(calcular_estado)
+df["estado"] = df["progress"].apply(calcular_estado)
 df["timeline_status"] = df.apply(calcular_timeline, axis=1)
 
 # quitar hora
@@ -140,19 +138,26 @@ edited_df = st.data_editor(
     column_config={
         "nivel": st.column_config.SelectboxColumn(
             "nivel",
-            options=["Proyecto", "Tarea", "Subtarea"]
+            options=["Proyecto", "Tarea", "Subtarea"],
         ),
         "status": st.column_config.TextColumn("Estado", disabled=True),
-        "timeline_status": st.column_config.TextColumn("Estado plazo", disabled=True)
+        "timeline_status": st.column_config.TextColumn("Estado plazo", disabled=True),
+            "estado": st.column_config.TextColumn("Estado", disabled=True),
+    "timeline_status": st.column_config.TextColumn("Estado plazo", disabled=True),
+        "start_date": st.column_config.DateColumn("Inicio"),
+"end_date": st.column_config.DateColumn("Fin"),
+
     },
+    
+
+
     disabled=["status", "timeline_status"]
 )
 
 # 🔥 FIX DEFINITIVO
 edited_df["progress"] = pd.to_numeric(edited_df["progress"], errors="coerce").fillna(0)
 
-edited_df["start_date"] = edited_df["start_date"].astype(str)
-edited_df["end_date"] = edited_df["end_date"].astype(str)
+
 
 
 
