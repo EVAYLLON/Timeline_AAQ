@@ -255,6 +255,17 @@ if st.button("Exportar HTML"):
     export_gantt_html(html, REPORT_PATH)
     st.success("Exportado ✅")
 
+# ✅ AQUÍ VA
+full_df["nivel_order"] = full_df["nivel"].map({
+    "Proyecto": 0,
+    "Tarea": 1,
+    "Subtarea": 2
+})
+
+full_df = full_df.sort_values(
+    by=["project_name", "nivel_order", "start_date"]
+).reset_index(drop=True)
+
 # ======================
 # GANTT
 # ======================
