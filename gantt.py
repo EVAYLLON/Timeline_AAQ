@@ -43,8 +43,18 @@ def build_ms_project_gantt_html(df, zoom="Proyecto completo"):
     data["start_date"] = pd.to_datetime(data["start_date"])
     data["end_date"] = pd.to_datetime(data["end_date"])
 
-    min_date = data["start_date"].min()
-    max_date = data["end_date"].max()
+    df = df.copy()
+
+    df["start_date"] = pd.to_datetime(df["start_date"], errors="coerce")
+    df["end_date"] = pd.to_datetime(df["end_date"], errors="coerce")
+
+
+    min_date = df["start_date"].dropna().min()
+    max_date = df["end_date"].dropna().max()
+
+    # ✅ protección crítica
+    if pd.isna(min_date) or pd.isna(max_date):
+        return "<h3>⚠️ No hay fechas válidas para mostrar el Gantt</h3>"
 
     if zoom == "30 días":
         max_date = min_date + pd.Timedelta(days=30)
