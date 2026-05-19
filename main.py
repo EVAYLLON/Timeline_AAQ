@@ -127,9 +127,10 @@ df["end_date"] = df["end_date"].dt.date
 # UI
 # ======================
 df_display = df.drop(
-    columns=["item_id", "parent_id", "project_id", "nivel_order"],
+    columns=["id", "item_id", "parent_id", "project_id", "nivel_order"],
     errors="ignore"
 )
+
 
 edited_df = st.data_editor(
     df_display,
