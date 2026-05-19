@@ -41,9 +41,21 @@ def guardar_todo(df):
         "document_url"
     ]
 
-    df_clean = df[columnas_validas]
+    df_clean = df.reindex(columns=columnas_validas)
+
+    # ✅ LIMPIEZA CRÍTICA
+    df_clean = df_clean.replace({pd.NA: None})
+    df_clean = df_clean.where(pd.notnull(df_clean), None)
+
+    # ✅ Fechas a string (solo aquí)
+    df_clean["start_date"] = df_clean["start_date"].astype(str)
+    df_clean["end_date"] = df_clean["end_date"].astype(str)
+
+    # ✅ progress seguro
+    df_clean["progress"] = pd.to_numeric(df_clean["progress"], errors="coerce").fillna(0)
 
     data = df_clean.to_dict(orient="records")
+
     supabase.table("projects").insert(data).execute()
 
 
