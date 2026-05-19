@@ -85,7 +85,7 @@ def build_ms_project_gantt_html(df, zoom="Proyecto completo"):
     rows_html = ""
 
     for _, row in data.iterrows():
-        style = LEVEL_STYLES.get(row["level"], LEVEL_STYLES["Subtarea"])
+        style = LEVEL_STYLES.get(row["nivel"], LEVEL_STYLES["Subtarea"])
         color = STATUS_COLORS.get(row["timeline_status"], "#607D8B")
 
         start = max(row["start_date"], min_date)
