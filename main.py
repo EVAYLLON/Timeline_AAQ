@@ -3,21 +3,34 @@ import pandas as pd
 import streamlit as st
 import streamlit.components.v1 as components
 from supabase import create_client
-import pandas as pd
-import streamlit as st
 
-# 🔑 tus credenciales
-SUPABASE_URL = "https://brrghdszvwvwxwouvqgl.supabase.co"
-SUPABASE_KEY = "sb_publishable_Kjb0Rhsp_tWeWxdof7-zWA_htBXB3MP"
+supabase = create_client("https://brrghdszvwvwxwouvqgl.supabase.co","sb_publishable_Kjb0Rhsp_tWeWxdof7-zWA_htBXB3MP")
+
+def cargar_datos():
+    response = supabase.table("projects").select("*").execute()
+    return pd.DataFrame(response.data)
+
+def guardar_todo(df):
+    supabase.table("projects").delete().neq("id", 0).execute()
+
+    columnas_validas = [
+        "nivel",
+        "project_name",
+        "item_name",
+        "responsible",
+        "start_date",
+        "end_date",
+        "progress",
+        "estado",
+        "document_url"
+    ]
+
+    df_clean = df[columnas_validas]
+
+    data = df_clean.to_dict(orient="records")
+    supabase.table("projects").insert(data).execute()
 
 
-
-from task_loader import (
-    load_tasks,
-    save_tasks,
-    flatten_tasks,
-    dataframe_to_nested_json
-)
 from gantt import build_ms_project_gantt_html, export_gantt_html
 
 # ======================
@@ -30,20 +43,7 @@ REPORT_PATH = BASE_DIR / "reports" / "gantt.html"
 st.set_page_config(layout="wide")
 st.title("Project Tracker (Jerarquía real)")
 
-# ======================
-# LOAD
-# ======================
-@st.cache_data(show_spinner=False)
-def cached_load(path):
-    return flatten_tasks(load_tasks(path))
-
-def reload_data():
-    st.cache_data.clear()
-    st.session_state["df"] = cached_load(str(JSON_PATH))
-
-if "df" not in st.session_state:
-    reload_data()
-
+df = cargar_datos()
 # ======================
 # FUNCIONES
 # ======================
@@ -88,13 +88,12 @@ def calcular_timeline(row):
 # ======================
 # LIMPIEZA
 # ======================
-df = st.session_state["df"].copy()
 
 df["start_date"] = pd.to_datetime(df["start_date"], errors="coerce")
 df["end_date"] = pd.to_datetime(df["end_date"], errors="coerce")
 df["progress"] = pd.to_numeric(df["progress"], errors="coerce").fillna(0)
 
-for col in ["level", "project_name", "item_name", "responsible"]:
+for col in ["nivel", "project_name", "item_name", "responsible"]:
     df[col] = df[col].fillna("").astype(str)
 
 # 🔥 CLAVE: BORRAR estado antiguo
@@ -114,7 +113,7 @@ df["end_date"] = df["end_date"].dt.date
 # UI
 # ======================
 df_display = df.drop(
-    columns=["item_id", "parent_id", "project_id", "level_order"],
+    columns=["item_id", "parent_id", "project_id", "nivel_order"],
     errors="ignore"
 )
 
@@ -123,8 +122,8 @@ edited_df = st.data_editor(
     num_rows="dynamic",
     use_container_width=True,
     column_config={
-        "level": st.column_config.SelectboxColumn(
-            "Nivel",
+        "nivel": st.column_config.SelectboxColumn(
+            "nivel",
             options=["Proyecto", "Tarea", "Subtarea"]
         ),
         "status": st.column_config.TextColumn("Estado", disabled=True),
@@ -136,8 +135,9 @@ edited_df = st.data_editor(
 # 🔥 FIX DEFINITIVO
 edited_df["progress"] = pd.to_numeric(edited_df["progress"], errors="coerce").fillna(0)
 
-edited_df["status"] = edited_df["progress"].apply(calcular_estado)
-edited_df["timeline_status"] = edited_df.apply(calcular_timeline, axis=1)
+edited_df["start_date"] = edited_df["start_date"].astype(str)
+edited_df["end_date"] = edited_df["end_date"].astype(str)
+
 
 
 # ======================
@@ -158,8 +158,8 @@ full_df["timeline_status"] = full_df.apply(calcular_timeline, axis=1)
 # ======================
 # JERARQUIA
 # ======================
-level_map = {"Proyecto": 0, "Tarea": 1, "Subtarea": 2}
-full_df["level_order"] = full_df["level"].map(level_map).fillna(2)
+nivel_map = {"Proyecto": 0, "Tarea": 1, "Subtarea": 2}
+full_df["nivel_order"] = full_df["nivel"].map(nivel_map).fillna(2)
 
 full_df["item_id"] = range(1, len(full_df) + 1)
 
@@ -168,13 +168,13 @@ current_task = None
 parents = []
 
 for _, r in full_df.iterrows():
-    if r["level"] == "Proyecto":
+    if r["nivel"] == "Proyecto":
         current_project = r["item_id"]
         parents.append("")
-    elif r["level"] == "Tarea":
+    elif r["nivel"] == "Tarea":
         parents.append(current_project)
         current_task = r["item_id"]
-    elif r["level"] == "Subtarea":
+    elif r["nivel"] == "Subtarea":
         parents.append(current_task)
     else:
         parents.append("")
@@ -201,15 +201,20 @@ for i in full_df.index:
 # ======================
 # BOTONES
 # ======================
-if st.button("Guardar JSON"):
-    save_tasks(dataframe_to_nested_json(full_df), JSON_PATH)
-    reload_data()
-    st.success("Guardado ✅")
+if st.button("Guardar cambios"):
+    full_df["start_date"] = full_df["start_date"].astype(str)
+    full_df["end_date"] = full_df["end_date"].astype(str)
+    
+    full_df["estado"] = full_df["status"]
 
+    guardar_todo(full_df)
+    st.success("Guardado en Supabase ✅")
+    st.rerun()
+
+    
 if st.button("Actualizar Gantt"):
-    save_tasks(dataframe_to_nested_json(full_df), JSON_PATH)
-    reload_data()
-    st.success("Actualizado ✅")
+    st.success("Solo visualización actualizada ✅")
+
 
 if st.button("Exportar HTML"):
     html = build_ms_project_gantt_html(full_df)
