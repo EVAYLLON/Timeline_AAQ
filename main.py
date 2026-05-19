@@ -197,23 +197,23 @@ full_df["nivel_order"] = full_df["nivel"].map(nivel_map).fillna(2)
 
 full_df["item_id"] = range(1, len(full_df) + 1)
 
-current_project = None
-current_task = None
 parents = []
+
+# mapa: nombre de proyecto → item_id del proyecto
+project_ids = {}
 
 for _, r in full_df.iterrows():
     if r["nivel"] == "Proyecto":
-        current_project = r["item_id"]
+        project_ids[r["project_name"]] = r["item_id"]
         parents.append("")
     elif r["nivel"] == "Tarea":
-        parents.append(current_project)
-        current_task = r["item_id"]
+        parent_id = project_ids.get(r["project_name"], "")
+        parents.append(parent_id)
     elif r["nivel"] == "Subtarea":
-        parents.append(current_task)
+        parent_id = project_ids.get(r["project_name"], "")
+        parents.append(parent_id)
     else:
         parents.append("")
-
-full_df["parent_id"] = parents
 
 
 # ======================
