@@ -2,6 +2,15 @@ from pathlib import Path
 import pandas as pd
 import streamlit as st
 import streamlit.components.v1 as components
+from supabase import create_client
+import pandas as pd
+import streamlit as st
+
+# 🔑 tus credenciales
+SUPABASE_URL = "https://brrghdszvwvwxwouvqgl.supabase.co"
+SUPABASE_KEY = "sb_publishable_Kjb0Rhsp_tWeWxdof7-zWA_htBXB3MP"
+
+
 
 from task_loader import (
     load_tasks,
