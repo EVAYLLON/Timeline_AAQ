@@ -8,7 +8,23 @@ supabase = create_client("https://brrghdszvwvwxwouvqgl.supabase.co","sb_publisha
 
 def cargar_datos():
     response = supabase.table("projects").select("*").execute()
-    return pd.DataFrame(response.data)
+    data = response.data
+
+    if not data:
+        # estructura vacía con columnas correctas
+        return pd.DataFrame(columns=[
+            "nivel",
+            "project_name",
+            "item_name",
+            "responsible",
+            "start_date",
+            "end_date",
+            "progress",
+            "estado",
+            "document_url"
+        ])
+
+    return pd.DataFrame(data)
 
 def guardar_todo(df):
     supabase.table("projects").delete().neq("id", 0).execute()

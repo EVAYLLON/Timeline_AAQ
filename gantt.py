@@ -26,7 +26,18 @@ def _safe_link(url):
 def build_ms_project_gantt_html(df, zoom="Proyecto completo"):
 
     if df.empty:
-        return "<p>No existen datos</p>"
+        df = pd.DataFrame([{
+            "nivel": "Proyecto",
+            "project_name": "",
+            "item_name": "",
+            "responsible": "",
+            "start_date": "",
+            "end_date": "",
+            "progress": 0,
+            "estado": "",
+            "document_url": ""
+        }])
+
 
     data = df.copy()
     data["start_date"] = pd.to_datetime(data["start_date"])
