@@ -59,28 +59,20 @@ def guardar_todo(df):
 
     data = df_clean.to_dict(orient="records")
 
+# 🔥 limpiar ids antes
     for row in data:
-        try:
-            # 🔥 FIX CRÍTICO: asegurar id correcto
-            id_value = row.get("id")
+        id_value = row.get("id")
 
-            if id_value is None or id_value == "" or pd.isna(id_value):
-                row.pop("id", None)
-            else:
-                # 🔥 convertir a entero real
-                row["id"] = int(id_value)
+        if id_value is None or id_value == "" or pd.isna(id_value):
+            row.pop("id", None)
+        else:
+            row["id"] = int(id_value)
 
-            supabase.table("projects").upsert(row, on_conflict="id").execute()
-
-        except Exception as e:
-            st.error(f"Error en fila: {row}")
-            st.error(str(e))
-
-
-
-
-
-
+    # 🔥 UPSERT EN BLOQUE (CLAVE)
+    supabase.table("projects").upsert(
+        data,
+        on_conflict="id"
+    ).execute()
 
 from gantt import build_ms_project_gantt_html, export_gantt_html
 
@@ -250,20 +242,6 @@ for i in full_df.index:
 # ======================
 # BOTONES
 # ======================
-if st.button("Guardar cambios"):
-    full_df["start_date"] = full_df["start_date"].astype(str)
-    full_df["end_date"] = full_df["end_date"].astype(str)
-    
-    full_df["estado"] = full_df["status"]
-
-    guardar_todo(full_df)
-    st.success("Guardado en Supabase ✅")
-    st.rerun()
-
-    
-if st.button("Actualizar Gantt"):
-    st.success("Solo visualización actualizada ✅")
-
 
 if st.button("Exportar HTML"):
     html = build_ms_project_gantt_html(full_df)
