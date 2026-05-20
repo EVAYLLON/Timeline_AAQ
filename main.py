@@ -3,17 +3,18 @@ import pandas as pd
 import streamlit as st
 import streamlit.components.v1 as components
 from supabase import create_client
+from gantt import build_ms_project_gantt_html, export_gantt_html
 
 # ======================
 # SUPABASE
 # ======================
-supabase = create_client(
-    "https://brrghdszvwvwxwouvqgl.supabase.co",
-    "sb_publishable_Kjb0Rhsp_tWeWxdof7-zWA_htBXB3MP"
-)
+SUPABASE_URL = "https://brrghdszvwvwxwouvqgl.supabase.co"
+SUPABASE_KEY = "sb_publishable_Kjb0Rhsp_tWeWxdof7-zWA_htBXB3MP"
+
+supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 # ======================
-# CARGAR DATOS
+# CARGA DATOS
 # ======================
 def cargar_datos():
     response = supabase.table("projects").select("*").execute()
@@ -21,38 +22,21 @@ def cargar_datos():
 
     if not data:
         return pd.DataFrame(columns=[
-            "id",
-            "nivel",
-            "project_name",
-            "item_name",
-            "responsible",
-            "start_date",
-            "end_date",
-            "progress",
-            "estado",
-            "document_url"
+            "nivel","project_name","item_name","responsible",
+            "start_date","end_date","progress","estado","document_url"
         ])
 
     return pd.DataFrame(data)
 
-
 # ======================
-# GUARDAR (SIN DUPLICAR)
+# GUARDAR DATOS
 # ======================
 def guardar_todo(df):
-    # ✅ BORRAR TODO CORRECTAMENTE
     supabase.table("projects").delete().gt("id", 0).execute()
 
     columnas_validas = [
-        "nivel",
-        "project_name",
-        "item_name",
-        "responsible",
-        "start_date",
-        "end_date",
-        "progress",
-        "estado",
-        "document_url"
+        "nivel","project_name","item_name","responsible",
+        "start_date","end_date","progress","estado","document_url"
     ]
 
     df_clean = df.reindex(columns=columnas_validas)
@@ -62,24 +46,17 @@ def guardar_todo(df):
     df_clean["end_date"] = df_clean["end_date"].astype(str)
     df_clean["progress"] = pd.to_numeric(df_clean["progress"], errors="coerce").fillna(0)
 
-    df_clean["estado"] = df_clean["estado"].fillna("")
-
     data = df_clean.to_dict(orient="records")
-
     supabase.table("projects").insert(data).execute()
 
 # ======================
-# GANTT
+# CONFIG
 # ======================
-from gantt import build_ms_project_gantt_html, export_gantt_html
+BASE_DIR = Path(__file__).resolve().parent
+REPORT_PATH = BASE_DIR / "reports" / "gantt.html"
 
-# ======================
-# APP
-# ======================
 st.set_page_config(layout="wide")
 st.title("Project Tracker (Jerarquía real)")
-
-df = cargar_datos()
 
 # ======================
 # FUNCIONES
@@ -96,7 +73,6 @@ def calcular_estado(x):
         return "No iniciado"
     else:
         return "En curso"
-
 
 def calcular_timeline(row):
     today = pd.Timestamp.today().normalize()
@@ -119,15 +95,17 @@ def calcular_timeline(row):
     else:
         return "En plazo"
 
+# ======================
+# DATA
+# ======================
+df = cargar_datos()
 
-# ======================
-# LIMPIEZA
-# ======================
+# limpieza
 df["start_date"] = pd.to_datetime(df["start_date"], errors="coerce")
 df["end_date"] = pd.to_datetime(df["end_date"], errors="coerce")
 df["progress"] = pd.to_numeric(df["progress"], errors="coerce").fillna(0)
 
-for col in ["nivel", "project_name", "item_name", "responsible"]:
+for col in ["nivel","project_name","item_name","responsible"]:
     df[col] = df[col].fillna("").astype(str)
 
 df["estado"] = df["progress"].apply(calcular_estado)
@@ -136,30 +114,30 @@ df["timeline_status"] = df.apply(calcular_timeline, axis=1)
 df["start_date"] = df["start_date"].dt.date
 df["end_date"] = df["end_date"].dt.date
 
-
 # ======================
 # UI
 # ======================
+df_display = df.drop(
+    columns=["id","item_id","parent_id","project_id","nivel_order"],
+    errors="ignore"
+)
+
 edited_df = st.data_editor(
-    df,
+    df_display,
     num_rows="dynamic",
     use_container_width=True,
     column_config={
         "nivel": st.column_config.SelectboxColumn(
             "Nivel",
-            options=["Proyecto", "Tarea", "Subtarea"]
+            options=["Proyecto","Tarea","Subtarea"]
         ),
-        "estado": st.column_config.TextColumn("Estado", disabled=True),
-        "timeline_status": st.column_config.TextColumn("Estado plazo", disabled=True),
         "start_date": st.column_config.DateColumn("Inicio"),
         "end_date": st.column_config.DateColumn("Fin"),
-        "id": None
+        "estado": st.column_config.TextColumn("Estado", disabled=True),
+        "timeline_status": st.column_config.TextColumn("Estado plazo", disabled=True)
     },
-    disabled=["estado", "timeline_status"]
+    disabled=["estado","timeline_status"]
 )
-
-edited_df["progress"] = pd.to_numeric(edited_df["progress"], errors="coerce").fillna(0)
-
 
 # ======================
 # RECONSTRUCCION
@@ -174,29 +152,22 @@ full_df["progress"] = pd.to_numeric(full_df["progress"], errors="coerce").fillna
 full_df["estado"] = full_df["progress"].apply(calcular_estado)
 full_df["timeline_status"] = full_df.apply(calcular_timeline, axis=1)
 
-# ✅ eliminar duplicados en memoria
-full_df = full_df.drop_duplicates(
-    subset=["nivel", "project_name", "item_name"]
-)
-
-# ✅ ORDEN CORRECTO PARA GANTT
-# 🔥 ORDEN JERÁRQUICO REAL
-
+# ======================
+# 🔥 FIX FINAL GANTT (CLAVE)
+# ======================
 orden = {"Proyecto": 0, "Tarea": 1, "Subtarea": 2}
 full_df["nivel_order"] = full_df["nivel"].map(orden)
 
-# ✅ separar proyectos y tareas
 proyectos = full_df[full_df["nivel"] == "Proyecto"]
 tareas = full_df[full_df["nivel"] != "Proyecto"]
 
-# ✅ reconstruir orden correcto
 df_ordenado = []
 
 for _, proj in proyectos.iterrows():
-    df_ordenado.append(proj)
+    df_ordenado.append(proj.to_dict())
 
     tareas_proj = tareas[tareas["project_name"] == proj["project_name"]]
-    tareas_proj = tareas_proj.sort_values(by=["nivel_order", "start_date"])
+    tareas_proj = tareas_proj.sort_values(by=["nivel_order","start_date"])
 
     df_ordenado.extend(tareas_proj.to_dict("records"))
 
@@ -210,24 +181,18 @@ if st.button("Guardar cambios"):
     full_df["end_date"] = full_df["end_date"].astype(str)
 
     guardar_todo(full_df)
-
-    st.success("Guardado correctamente ✅")
+    st.success("Guardado en Supabase ✅")
     st.rerun()
 
-
 if st.button("Exportar HTML"):
-    html_export = build_ms_project_gantt_html(full_df)
-    export_gantt_html(html_export, Path("gantt.html"))
+    html = build_ms_project_gantt_html(full_df)
+    export_gantt_html(html, REPORT_PATH)
     st.success("Exportado ✅")
-
 
 # ======================
 # GANTT
 # ======================
-zoom = st.selectbox(
-    "Zoom",
-    ["Proyecto completo", "30 días", "60 días"]
-)
+zoom = st.selectbox("Zoom", ["Proyecto completo","30 días","60 días"])
 
 html = build_ms_project_gantt_html(full_df, zoom=zoom)
 
