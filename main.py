@@ -69,7 +69,7 @@ def guardar_todo(df):
             if row.get("id") is None:
                 del row["id"]
 
-            supabase.table("projects").upsert(row).execute()
+            supabase.table("projects").upsert(row, on_conflict="id").execute()
 
         except Exception as e:
             st.error(f"Error en fila: {row}")
