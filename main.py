@@ -4,16 +4,24 @@ import streamlit as st
 import streamlit.components.v1 as components
 from supabase import create_client
 
-supabase = create_client("https://brrghdszvwvwxwouvqgl.supabase.co","sb_publishable_Kjb0Rhsp_tWeWxdof7-zWA_htBXB3MP")
+# ======================
+# SUPABASE
+# ======================
+supabase = create_client(
+    "https://brrghdszvwvwxwouvqgl.supabase.co",
+    "sb_publishable_Kjb0Rhsp_tWeWxdof7-zWA_htBXB3MP"
+)
 
-
+# ======================
+# CARGA DATOS
+# ======================
 def cargar_datos():
     response = supabase.table("projects").select("*").execute()
     data = response.data
 
     if not data:
-        # estructura vacía con columnas correctas
         return pd.DataFrame(columns=[
+            "id",
             "nivel",
             "project_name",
             "item_name",
@@ -27,12 +35,9 @@ def cargar_datos():
 
     return pd.DataFrame(data)
 
-
-def load_data():
-    response = supabase.table("projects").select("*").execute()
-    return pd.DataFrame(response.data)
-
-
+# ======================
+# GUARDAR
+# ======================
 def guardar_todo(df):
     columnas_validas = [
         "id",
@@ -49,6 +54,7 @@ def guardar_todo(df):
 
     df_clean = df.reindex(columns=columnas_validas)
 
+    # ✅ limpiar datos
     df_clean = df_clean.replace({pd.NA: None})
     df_clean = df_clean.astype(object)
     df_clean = df_clean.where(pd.notnull(df_clean), None)
@@ -59,36 +65,32 @@ def guardar_todo(df):
 
     data = df_clean.to_dict(orient="records")
 
-# 🔥 limpiar ids antes
+    # ✅ limpiar id
     for row in data:
         id_value = row.get("id")
-
         if id_value is None or id_value == "" or pd.isna(id_value):
             row.pop("id", None)
         else:
             row["id"] = int(id_value)
 
-    # 🔥 UPSERT EN BLOQUE (CLAVE)
-    supabase.table("projects").upsert(
-        data,
-        on_conflict="id"
-    ).execute()
+    # ✅ UPSERT (CLAVE)
+    supabase.table("projects").upsert(data, on_conflict="id").execute()
 
+# ======================
+# GANTT
+# ======================
 from gantt import build_ms_project_gantt_html, export_gantt_html
 
 # ======================
-# CONFIG
+# APP
 # ======================
-BASE_DIR = Path(__file__).resolve().parent
-JSON_PATH = BASE_DIR / "config" / "tasks.json"
-REPORT_PATH = BASE_DIR / "reports" / "gantt.html"
-
 st.set_page_config(layout="wide")
 st.title("Project Tracker (Jerarquía real)")
 
 df = cargar_datos()
+
 # ======================
-# FUNCIONES
+# CALCULOS
 # ======================
 def calcular_estado(x):
     try:
@@ -110,7 +112,6 @@ def calcular_timeline(row):
     progress = pd.to_numeric(row.get("progress", 0), errors="coerce")
     progress = 0 if pd.isna(progress) else progress
 
-    # ✅ PRIORIDAD
     if progress >= 100:
         return "Completado"
 
@@ -126,11 +127,9 @@ def calcular_timeline(row):
     else:
         return "En plazo"
 
-
 # ======================
 # LIMPIEZA
 # ======================
-
 df["start_date"] = pd.to_datetime(df["start_date"], errors="coerce")
 df["end_date"] = pd.to_datetime(df["end_date"], errors="coerce")
 df["progress"] = pd.to_numeric(df["progress"], errors="coerce").fillna(0)
@@ -138,48 +137,35 @@ df["progress"] = pd.to_numeric(df["progress"], errors="coerce").fillna(0)
 for col in ["nivel", "project_name", "item_name", "responsible"]:
     df[col] = df[col].fillna("").astype(str)
 
-# 🔥 CLAVE: BORRAR estado antiguo
-df["timeline_status"] = ""
-
-# ✅ recalcular limpio SIEMPRE
 df["estado"] = df["progress"].apply(calcular_estado)
 df["timeline_status"] = df.apply(calcular_timeline, axis=1)
 
-# quitar hora
 df["start_date"] = df["start_date"].dt.date
 df["end_date"] = df["end_date"].dt.date
-
 
 # ======================
 # UI
 # ======================
-df_display = df.copy()
-
 edited_df = st.data_editor(
-    df_display,
+    df,
     num_rows="dynamic",
     use_container_width=True,
     column_config={
         "nivel": st.column_config.SelectboxColumn(
-            "nivel",
-            options=["Proyecto", "Tarea", "Subtarea"],
+            "Nivel",
+            options=["Proyecto", "Tarea", "Subtarea"]
         ),
         "estado": st.column_config.TextColumn("Estado", disabled=True),
         "timeline_status": st.column_config.TextColumn("Estado plazo", disabled=True),
         "start_date": st.column_config.DateColumn("Inicio"),
         "end_date": st.column_config.DateColumn("Fin"),
-        "id": None  # 🔥 ocultar ID
+        "id": None  # ocultar ID
     },
-    disabled=["id", "status", "timeline_status"]
+    disabled=["id", "estado", "timeline_status"]
 )
 
-
-# 🔥 FIX DEFINITIVO
+# ✅ limpiar valores
 edited_df["progress"] = pd.to_numeric(edited_df["progress"], errors="coerce").fillna(0)
-
-
-
-
 
 # ======================
 # RECONSTRUCCION
@@ -188,81 +174,50 @@ full_df = edited_df.copy()
 
 full_df["start_date"] = pd.to_datetime(full_df["start_date"], errors="coerce")
 full_df["end_date"] = pd.to_datetime(full_df["end_date"], errors="coerce")
-
 full_df["progress"] = pd.to_numeric(full_df["progress"], errors="coerce").fillna(0)
 
-# 🔥 DOBLE SEGURIDAD
-full_df["status"] = full_df["progress"].apply(calcular_estado)
+full_df["estado"] = full_df["progress"].apply(calcular_estado)
 full_df["timeline_status"] = full_df.apply(calcular_timeline, axis=1)
 
+# ✅ quitar duplicados
+full_df = full_df.drop_duplicates(
+    subset=["nivel", "project_name", "item_name"]
+)
 
-# ======================
-# JERARQUIA
-# ======================
-nivel_map = {"Proyecto": 0, "Tarea": 1, "Subtarea": 2}
-full_df["nivel_order"] = full_df["nivel"].map(nivel_map).fillna(2)
+# ✅ ordenar correctamente (CLAVE)
+proyectos = full_df[full_df["nivel"] == "Proyecto"]
+tareas = full_df[full_df["nivel"] != "Proyecto"]
 
-full_df["item_id"] = range(1, len(full_df) + 1)
-
-parents = []
-
-# mapa: nombre de proyecto → item_id del proyecto
-project_ids = {}
-
-for _, r in full_df.iterrows():
-    if r["nivel"] == "Proyecto":
-        project_ids[r["project_name"]] = r["item_id"]
-        parents.append("")
-    elif r["nivel"] == "Tarea":
-        parent_id = project_ids.get(r["project_name"], "")
-        parents.append(parent_id)
-    elif r["nivel"] == "Subtarea":
-        parent_id = project_ids.get(r["project_name"], "")
-        parents.append(parent_id)
-    else:
-        parents.append("")
-
-
-# ======================
-# PROJECT ID
-# ======================
-project_map = {}
-counter = 1
-
-for i in full_df.index:
-    name = full_df.loc[i, "project_name"]
-
-    if name not in project_map:
-        project_map[name] = f"PRJ-{str(counter).zfill(3)}"
-        counter += 1
-
-    full_df.loc[i, "project_id"] = project_map[name]
-
+full_df = pd.concat([
+    proyectos.sort_values("project_name"),
+    tareas.sort_values(["project_name", "start_date"])
+]).reset_index(drop=True)
 
 # ======================
 # BOTONES
 # ======================
+if st.button("Guardar cambios"):
+    full_df["start_date"] = full_df["start_date"].astype(str)
+    full_df["end_date"] = full_df["end_date"].astype(str)
+
+    guardar_todo(full_df)
+
+    st.success("Guardado correctamente ✅")
+    st.rerun()
 
 if st.button("Exportar HTML"):
-    html = build_ms_project_gantt_html(full_df)
-    export_gantt_html(html, REPORT_PATH)
+    html_export = build_ms_project_gantt_html(full_df)
+    export_gantt_html(html_export, Path("gantt.html"))
     st.success("Exportado ✅")
-
-# ✅ AQUÍ VA
-full_df["nivel_order"] = full_df["nivel"].map({
-    "Proyecto": 0,
-    "Tarea": 1,
-    "Subtarea": 2
-})
-
-full_df = full_df.sort_values(
-    by=["project_name", "nivel_order", "start_date"]
-).reset_index(drop=True)
 
 # ======================
 # GANTT
 # ======================
-zoom = st.selectbox("Zoom", ["Proyecto completo", "30 días", "60 días"])
+zoom = st.selectbox(
+    "Zoom",
+    ["Proyecto completo", "30 días", "60 días"]
+)
+
 html = build_ms_project_gantt_html(full_df, zoom=zoom)
 
 components.html(html, height=600, scrolling=True)
