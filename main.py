@@ -32,11 +32,6 @@ def load_data():
     response = supabase.table("projects").select("*").execute()
     return pd.DataFrame(response.data)
 
-def save_data(df):
-    data = df.to_dict(orient="records")
-    
-
-    supabase.table("projects").upsert(row).execute()
 
 def guardar_todo(df):
     columnas_validas = [
@@ -162,7 +157,6 @@ df["end_date"] = df["end_date"].dt.date
 # ======================
 df_display = df.copy()
 
-
 edited_df = st.data_editor(
     df_display,
     num_rows="dynamic",
@@ -172,32 +166,15 @@ edited_df = st.data_editor(
             "nivel",
             options=["Proyecto", "Tarea", "Subtarea"],
         ),
-        "status": st.column_config.TextColumn("Estado", disabled=True),
+        "estado": st.column_config.TextColumn("Estado", disabled=True),
         "timeline_status": st.column_config.TextColumn("Estado plazo", disabled=True),
-            "estado": st.column_config.TextColumn("Estado", disabled=True),
         "start_date": st.column_config.DateColumn("Inicio"),
-"end_date": st.column_config.DateColumn("Fin"),
-
+        "end_date": st.column_config.DateColumn("Fin"),
+        "id": None  # 🔥 ocultar ID
     },
-    
-
-
-    disabled=["status", "timeline_status"]
+    disabled=["id", "status", "timeline_status"]
 )
 
-
-
-edited_df = st.data_editor(
-    df_display,
-    num_rows="dynamic",
-    use_container_width=True,
-    disabled=["id", "status", "timeline_status"],
-)
-
-
-column_config={
-    "id": None
-}
 
 # 🔥 FIX DEFINITIVO
 edited_df["progress"] = pd.to_numeric(edited_df["progress"], errors="coerce").fillna(0)
