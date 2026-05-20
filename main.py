@@ -160,10 +160,7 @@ df["end_date"] = df["end_date"].dt.date
 # ======================
 # UI
 # ======================
-df_display = df.drop(
-    columns=["id", "item_id", "parent_id", "project_id", "nivel_order"],
-    errors="ignore"
-)
+df_display = df.copy()
 
 
 edited_df = st.data_editor(
@@ -187,6 +184,20 @@ edited_df = st.data_editor(
 
     disabled=["status", "timeline_status"]
 )
+
+
+
+edited_df = st.data_editor(
+    df_display,
+    num_rows="dynamic",
+    use_container_width=True,
+    disabled=["id", "status", "timeline_status"],
+)
+
+
+column_config={
+    "id": None
+}
 
 # 🔥 FIX DEFINITIVO
 edited_df["progress"] = pd.to_numeric(edited_df["progress"], errors="coerce").fillna(0)
