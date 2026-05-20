@@ -41,19 +41,7 @@ def save_data(df):
 
 def guardar_todo(df):
     columnas_validas = [
-        "nivel",
-        "project_name",
-        "item_name",
-        "responsible",
-        "start_date",
-        "end_date",
-        "progress",
-        "estado",
-        "document_url"
-    ]
-
-    columnas_validas = [
-        "id",  # 🔥 IMPORTANTE
+        "id",
         "nivel",
         "project_name",
         "item_name",
@@ -67,8 +55,9 @@ def guardar_todo(df):
 
     df_clean = df.reindex(columns=columnas_validas)
 
-
+    # 🔥 LIMPIEZA TOTAL
     df_clean = df_clean.replace({pd.NA: None})
+    df_clean = df_clean.astype(object)
     df_clean = df_clean.where(pd.notnull(df_clean), None)
 
     df_clean["start_date"] = df_clean["start_date"].astype(str)
@@ -78,9 +67,12 @@ def guardar_todo(df):
 
     data = df_clean.to_dict(orient="records")
 
-    # 🔥 CLAVE: UPSERT (NO BORRA NADA)
     for row in data:
-        supabase.table("projects").upsert(row).execute()
+        try:
+            supabase.table("projects").upsert(row).execute()
+        except Exception as e:
+            print("ERROR:", row, e)
+
 
 
 
