@@ -39,12 +39,7 @@ def save_data(df):
     for row in data:
         supabase.table("projects").insert(row).execute()
 
-
 def guardar_todo(df):
-    # 🔥 1. borrar tabla
-    supabase.table("projects").delete().neq("id", 0).execute()
-
-    # 🔥 2. SOLO columnas válidas de la BD
     columnas_validas = [
         "nivel",
         "project_name",
@@ -57,23 +52,36 @@ def guardar_todo(df):
         "document_url"
     ]
 
-    df_clean = df[columnas_validas].copy()
+    columnas_validas = [
+        "id",  # 🔥 IMPORTANTE
+        "nivel",
+        "project_name",
+        "item_name",
+        "responsible",
+        "start_date",
+        "end_date",
+        "progress",
+        "estado",
+        "document_url"
+    ]
 
-    # 🔥 3. limpiar nulos
+    df_clean = df.reindex(columns=columnas_validas)
+
+
     df_clean = df_clean.replace({pd.NA: None})
     df_clean = df_clean.where(pd.notnull(df_clean), None)
 
-    # 🔥 4. fechas a string
     df_clean["start_date"] = df_clean["start_date"].astype(str)
     df_clean["end_date"] = df_clean["end_date"].astype(str)
 
-    # 🔥 5. progress limpio
     df_clean["progress"] = pd.to_numeric(df_clean["progress"], errors="coerce").fillna(0)
 
-    # 🔥 6. INSERT MASIVO (mejor)
     data = df_clean.to_dict(orient="records")
 
-    supabase.table("projects").insert(data).execute()
+    # 🔥 CLAVE: UPSERT (NO BORRA NADA)
+    for row in data:
+        supabase.table("projects").upsert(row).execute()
+
 
 
 
