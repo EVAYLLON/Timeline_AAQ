@@ -180,14 +180,27 @@ full_df = full_df.drop_duplicates(
 )
 
 # ✅ ORDEN CORRECTO PARA GANTT
+# 🔥 ORDEN JERÁRQUICO REAL
+
+orden = {"Proyecto": 0, "Tarea": 1, "Subtarea": 2}
+full_df["nivel_order"] = full_df["nivel"].map(orden)
+
+# ✅ separar proyectos y tareas
 proyectos = full_df[full_df["nivel"] == "Proyecto"]
 tareas = full_df[full_df["nivel"] != "Proyecto"]
 
-full_df = pd.concat([
-    proyectos.sort_values("project_name"),
-    tareas.sort_values(["project_name", "start_date"])
-]).reset_index(drop=True)
+# ✅ reconstruir orden correcto
+df_ordenado = []
 
+for _, proj in proyectos.iterrows():
+    df_ordenado.append(proj)
+
+    tareas_proj = tareas[tareas["project_name"] == proj["project_name"]]
+    tareas_proj = tareas_proj.sort_values(by=["nivel_order", "start_date"])
+
+    df_ordenado.extend(tareas_proj.to_dict("records"))
+
+full_df = pd.DataFrame(df_ordenado).reset_index(drop=True)
 
 # ======================
 # BOTONES
