@@ -6,6 +6,7 @@ from supabase import create_client
 
 supabase = create_client("https://brrghdszvwvwxwouvqgl.supabase.co","sb_publishable_Kjb0Rhsp_tWeWxdof7-zWA_htBXB3MP")
 
+
 def cargar_datos():
     response = supabase.table("projects").select("*").execute()
     data = response.data
@@ -26,9 +27,24 @@ def cargar_datos():
 
     return pd.DataFrame(data)
 
+
+def load_data():
+    response = supabase.table("projects").select("*").execute()
+    return pd.DataFrame(response.data)
+
+def save_data(df):
+    data = df.to_dict(orient="records")
+    
+
+    for row in data:
+        supabase.table("projects").insert(row).execute()
+
+
 def guardar_todo(df):
+    # 🔥 1. borrar tabla
     supabase.table("projects").delete().neq("id", 0).execute()
 
+    # 🔥 2. SOLO columnas válidas de la BD
     columnas_validas = [
         "nivel",
         "project_name",
@@ -41,22 +57,26 @@ def guardar_todo(df):
         "document_url"
     ]
 
-    df_clean = df.reindex(columns=columnas_validas)
+    df_clean = df[columnas_validas].copy()
 
-    # ✅ LIMPIEZA CRÍTICA
+    # 🔥 3. limpiar nulos
     df_clean = df_clean.replace({pd.NA: None})
     df_clean = df_clean.where(pd.notnull(df_clean), None)
 
-    # ✅ Fechas a string (solo aquí)
+    # 🔥 4. fechas a string
     df_clean["start_date"] = df_clean["start_date"].astype(str)
     df_clean["end_date"] = df_clean["end_date"].astype(str)
 
-    # ✅ progress seguro
+    # 🔥 5. progress limpio
     df_clean["progress"] = pd.to_numeric(df_clean["progress"], errors="coerce").fillna(0)
 
+    # 🔥 6. INSERT MASIVO (mejor)
     data = df_clean.to_dict(orient="records")
 
     supabase.table("projects").insert(data).execute()
+
+
+
 
 
 from gantt import build_ms_project_gantt_html, export_gantt_html
@@ -156,7 +176,6 @@ edited_df = st.data_editor(
         "status": st.column_config.TextColumn("Estado", disabled=True),
         "timeline_status": st.column_config.TextColumn("Estado plazo", disabled=True),
             "estado": st.column_config.TextColumn("Estado", disabled=True),
-    "timeline_status": st.column_config.TextColumn("Estado plazo", disabled=True),
         "start_date": st.column_config.DateColumn("Inicio"),
 "end_date": st.column_config.DateColumn("Fin"),
 
