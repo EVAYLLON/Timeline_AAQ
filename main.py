@@ -64,12 +64,16 @@ def guardar_todo(df):
 
     data = df_clean.to_dict(orient="records")
 
-    # ✅ SOLO AQUÍ
     for row in data:
-        if row.get("id") is None:
-            del row["id"]
+        try:
+            if row.get("id") is None:
+                del row["id"]
 
-        supabase.table("projects").upsert(row).execute()
+            supabase.table("projects").upsert(row).execute()
+
+        except Exception as e:
+            st.error(f"Error en fila: {row}")
+            st.error(str(e))
 
 
 
