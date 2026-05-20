@@ -40,9 +40,10 @@ def cargar_datos():
 # GUARDAR (SIN DUPLICAR)
 # ======================
 def guardar_todo(df):
+    # ✅ BORRAR TODO CORRECTAMENTE
+    supabase.table("projects").delete().gt("id", 0).execute()
 
     columnas_validas = [
-        "id",
         "nivel",
         "project_name",
         "item_name",
@@ -55,41 +56,17 @@ def guardar_todo(df):
     ]
 
     df_clean = df.reindex(columns=columnas_validas)
-
-    # ✅ eliminar filas inválidas (clave)
-    df_clean = df_clean[
-        (df_clean["project_name"].notnull()) &
-        (df_clean["project_name"] != "") &
-        (df_clean["item_name"].notnull()) &
-        (df_clean["item_name"] != "")
-    ]
-
-    # ✅ limpieza general
-    df_clean = df_clean.replace({pd.NA: None})
-    df_clean = df_clean.astype(object)
     df_clean = df_clean.where(pd.notnull(df_clean), None)
 
     df_clean["start_date"] = df_clean["start_date"].astype(str)
     df_clean["end_date"] = df_clean["end_date"].astype(str)
     df_clean["progress"] = pd.to_numeric(df_clean["progress"], errors="coerce").fillna(0)
 
+    df_clean["estado"] = df_clean["estado"].fillna("")
+
     data = df_clean.to_dict(orient="records")
 
-    # ✅ limpiar id
-    for row in data:
-        id_value = row.get("id")
-
-        if id_value is None or id_value == "" or pd.isna(id_value):
-            row.pop("id", None)
-        else:
-            row["id"] = int(id_value)
-
-    # ✅ UPSERT CORRECTO
-    supabase.table("projects").upsert(
-        data,
-        on_conflict="project_name,item_name"
-    ).execute()
-
+    supabase.table("projects").insert(data).execute()
 
 # ======================
 # GANTT
