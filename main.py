@@ -36,9 +36,13 @@ def save_data(df):
     data = df.to_dict(orient="records")
     
 
-    for row in data:
-        supabase.table("projects").insert(row).execute()
+for row in data:
+    # 🔥 QUITAR id si es None
+    if row.get("id") is None:
+        del row["id"]
 
+    supabase.table("projects").upsert(row).execute()
+    
 def guardar_todo(df):
     columnas_validas = [
         "id",
