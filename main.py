@@ -42,7 +42,7 @@ for row in data:
         del row["id"]
 
     supabase.table("projects").upsert(row).execute()
-    
+
 def guardar_todo(df):
     columnas_validas = [
         "id",
@@ -59,23 +59,25 @@ def guardar_todo(df):
 
     df_clean = df.reindex(columns=columnas_validas)
 
-    # 🔥 LIMPIEZA TOTAL
+    # limpieza
     df_clean = df_clean.replace({pd.NA: None})
     df_clean = df_clean.astype(object)
     df_clean = df_clean.where(pd.notnull(df_clean), None)
 
     df_clean["start_date"] = df_clean["start_date"].astype(str)
     df_clean["end_date"] = df_clean["end_date"].astype(str)
-
     df_clean["progress"] = pd.to_numeric(df_clean["progress"], errors="coerce").fillna(0)
 
+    # ✅ AQUÍ SE DEFINE data
     data = df_clean.to_dict(orient="records")
 
+    # ✅ Y AQUÍ se usa correctamente
     for row in data:
-        try:
-            supabase.table("projects").upsert(row).execute()
-        except Exception as e:
-            print("ERROR:", row, e)
+        if row.get("id") is None:
+            del row["id"]
+
+        supabase.table("projects").upsert(row).execute()
+
 
 
 
