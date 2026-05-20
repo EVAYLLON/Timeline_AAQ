@@ -61,8 +61,14 @@ def guardar_todo(df):
 
     for row in data:
         try:
-            if row.get("id") is None:
-                del row["id"]
+            # 🔥 FIX CRÍTICO: asegurar id correcto
+            id_value = row.get("id")
+
+            if id_value is None or id_value == "" or pd.isna(id_value):
+                row.pop("id", None)
+            else:
+                # 🔥 convertir a entero real
+                row["id"] = int(id_value)
 
             supabase.table("projects").upsert(row, on_conflict="id").execute()
 
