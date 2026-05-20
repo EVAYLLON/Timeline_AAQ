@@ -263,7 +263,6 @@ full_df = full_df.sort_values(
 # GANTT
 # ======================
 zoom = st.selectbox("Zoom", ["Proyecto completo", "30 días", "60 días"])
-
 html = build_ms_project_gantt_html(full_df, zoom=zoom)
 
 components.html(html, height=600, scrolling=True)
