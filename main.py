@@ -13,7 +13,7 @@ supabase = create_client(
 )
 
 # ======================
-# CARGA DATOS
+# CARGAR DATOS
 # ======================
 def cargar_datos():
     response = supabase.table("projects").select("*").execute()
@@ -35,8 +35,9 @@ def cargar_datos():
 
     return pd.DataFrame(data)
 
+
 # ======================
-# GUARDAR (FIX REAL)
+# GUARDAR (SIN DUPLICAR)
 # ======================
 def guardar_todo(df):
 
@@ -55,7 +56,15 @@ def guardar_todo(df):
 
     df_clean = df.reindex(columns=columnas_validas)
 
-    # ✅ LIMPIEZA
+    # ✅ eliminar filas inválidas (clave)
+    df_clean = df_clean[
+        (df_clean["project_name"].notnull()) &
+        (df_clean["project_name"] != "") &
+        (df_clean["item_name"].notnull()) &
+        (df_clean["item_name"] != "")
+    ]
+
+    # ✅ limpieza general
     df_clean = df_clean.replace({pd.NA: None})
     df_clean = df_clean.astype(object)
     df_clean = df_clean.where(pd.notnull(df_clean), None)
@@ -64,13 +73,9 @@ def guardar_todo(df):
     df_clean["end_date"] = df_clean["end_date"].astype(str)
     df_clean["progress"] = pd.to_numeric(df_clean["progress"], errors="coerce").fillna(0)
 
-    # ✅ evitar vacíos
-    df_clean["project_name"] = df_clean["project_name"].fillna("")
-    df_clean["item_name"] = df_clean["item_name"].fillna("")
-
     data = df_clean.to_dict(orient="records")
 
-    # ✅ limpiar ID
+    # ✅ limpiar id
     for row in data:
         id_value = row.get("id")
 
@@ -79,11 +84,12 @@ def guardar_todo(df):
         else:
             row["id"] = int(id_value)
 
-    # ✅ 🔥 UPSERT INTELIGENTE (CLAVE)
+    # ✅ UPSERT CORRECTO
     supabase.table("projects").upsert(
         data,
         on_conflict="project_name,item_name"
     ).execute()
+
 
 # ======================
 # GANTT
@@ -99,7 +105,7 @@ st.title("Project Tracker (Jerarquía real)")
 df = cargar_datos()
 
 # ======================
-# LOGICA
+# FUNCIONES
 # ======================
 def calcular_estado(x):
     try:
@@ -136,6 +142,7 @@ def calcular_timeline(row):
     else:
         return "En plazo"
 
+
 # ======================
 # LIMPIEZA
 # ======================
@@ -151,6 +158,7 @@ df["timeline_status"] = df.apply(calcular_timeline, axis=1)
 
 df["start_date"] = df["start_date"].dt.date
 df["end_date"] = df["end_date"].dt.date
+
 
 # ======================
 # UI
@@ -175,6 +183,7 @@ edited_df = st.data_editor(
 
 edited_df["progress"] = pd.to_numeric(edited_df["progress"], errors="coerce").fillna(0)
 
+
 # ======================
 # RECONSTRUCCION
 # ======================
@@ -188,7 +197,7 @@ full_df["progress"] = pd.to_numeric(full_df["progress"], errors="coerce").fillna
 full_df["estado"] = full_df["progress"].apply(calcular_estado)
 full_df["timeline_status"] = full_df.apply(calcular_timeline, axis=1)
 
-# ✅ eliminar duplicados (extra seguridad)
+# ✅ eliminar duplicados en memoria
 full_df = full_df.drop_duplicates(
     subset=["nivel", "project_name", "item_name"]
 )
@@ -202,6 +211,7 @@ full_df = pd.concat([
     tareas.sort_values(["project_name", "start_date"])
 ]).reset_index(drop=True)
 
+
 # ======================
 # BOTONES
 # ======================
@@ -214,10 +224,12 @@ if st.button("Guardar cambios"):
     st.success("Guardado correctamente ✅")
     st.rerun()
 
+
 if st.button("Exportar HTML"):
     html_export = build_ms_project_gantt_html(full_df)
     export_gantt_html(html_export, Path("gantt.html"))
     st.success("Exportado ✅")
+
 
 # ======================
 # GANTT
