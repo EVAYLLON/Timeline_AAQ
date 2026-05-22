@@ -39,20 +39,23 @@ def build_ms_project_gantt_html(df, start_date=None, end_date=None):
     if pd.isna(data_min) or pd.isna(data_max):
         return "<h3>⚠️ No hay fechas válidas</h3>"
 
-    # ✅ usar inputs si existen
+    # ✅ DEFINICIÓN SEGURA DEL RANGO
     min_date = pd.to_datetime(start_date) if start_date else data_min
     max_date = pd.to_datetime(end_date) if end_date else data_max
+
+    # ✅ CORRECCIÓN CLAVE
+    if min_date > max_date:
+        min_date, max_date = max_date, min_date
 
     total_days = max((max_date - min_date).days, 1)
     today = datetime.today()
 
-    # ================= HEADER MESES =================
+    # ================= HEADER =================
     months = pd.date_range(min_date, max_date, freq="MS")
     month_headers = ""
 
     for m in months:
         next_m = m + pd.offsets.MonthBegin(1)
-
         left = ((m - min_date).days / total_days) * 100
         width = ((next_m - m).days / total_days) * 100
 
@@ -62,15 +65,12 @@ def build_ms_project_gantt_html(df, start_date=None, end_date=None):
         </div>
         '''
 
-    # ✅ ESTE BLOQUE NO SE TOCA (LO MANTENEMOS EXACTO)
     day_headers = ""
     for i in range(total_days + 1):
         d = min_date + pd.Timedelta(days=i)
-
         left = ((i + 0.5) / total_days) * 100
 
-        is_today = d.date() == today.date()
-        cls = "day-label day-today" if is_today else "day-label"
+        cls = "day-label day-today" if d.date() == today.date() else "day-label"
 
         day_headers += f'''
         <div class="{cls}" style="left:{left:.2f}%;">
@@ -85,18 +85,25 @@ def build_ms_project_gantt_html(df, start_date=None, end_date=None):
 
     for _, row in df.iterrows():
 
+        if pd.isna(row["start_date"]) or pd.isna(row["end_date"]):
+            continue
+
         style = LEVEL_STYLES.get(row["nivel"], LEVEL_STYLES["Subtarea"])
         color = STATUS_COLORS.get(row["timeline_status"], "#607D8B")
 
-        # ✅ recorte visual (NO filtramos)
+        # ✅ recorte visual CONTROLADO
         start = max(row["start_date"], min_date)
         end = min(row["end_date"], max_date)
 
-        if pd.isna(start) or pd.isna(end):
+        # ✅ si tarea queda fuera completamente → no dibujar
+        if end < min_date or start > max_date:
             continue
 
-        left = ((start - min_date).days / total_days) * 100
-        width = max(((end - start).days / total_days) * 100, 1.5)
+        left_days = (start - min_date).days
+        duration_days = max((end - start).days, 1)
+
+        left = max((left_days / total_days) * 100, 0)
+        width = max((duration_days / total_days) * 100, 1.5)
 
         project_id = escape(str(row.get("project_name", "Sin Proyecto")))
         is_project = row["nivel"] == "Proyecto"
@@ -109,8 +116,7 @@ def build_ms_project_gantt_html(df, start_date=None, end_date=None):
             <div class="task-table">
 
                 <div style="padding-left:{style["indent"]}px; font-weight:{style["font_weight"]}; cursor:pointer;" {click}>
-                    <span class="expander">{style["icon"]}</span>
-                    {escape(str(row["item_name"]))}
+                    {style["icon"]} {escape(str(row["item_name"]))}
                 </div>
 
                 <div>{escape(str(row["responsible"]))}</div>
@@ -145,18 +151,7 @@ def build_ms_project_gantt_html(df, start_date=None, end_date=None):
     # ================= HTML =================
     html = f'''
 <style>
-
-body {{
-    font-family: Arial;
-}}
-
-.controls {{
-    padding:10px;
-    background:#f3f4f6;
-    display:flex;
-    gap:10px;
-    align-items:center;
-}}
+body {{ font-family: Arial; }}
 
 .gantt-wrapper {{
     border:1px solid #ccc;
@@ -206,8 +201,8 @@ body {{
     position:absolute;
     top:0;
     font-size:11px;
-    font-weight:600;
     text-align:center;
+    font-weight:600;
 }}
 
 .day-label {{
@@ -231,7 +226,7 @@ body {{
 
 .bar-progress {{
     height:100%;
-    background: rgba(255,255,255,0.4);
+    background: rgba(255,255,255,0.3);
 }}
 
 .status-pill {{
@@ -254,14 +249,6 @@ body {{
 }}
 
 </style>
-
-<div class="controls">
-    <label>Inicio:</label>
-    <input type="date" id="startDate">
-    
-    <label>Fin:</label>
-    <input type="date" id="endDate">
-</div>
 
 <div class="gantt-wrapper">
 
@@ -288,17 +275,14 @@ body {{
 </div>
 
 <script>
-
 function toggleProject(project) {{
     const rows = document.querySelectorAll('[data-project="' + project + '"]');
-
     rows.forEach((row) => {{
         if (!row.classList.contains("project-row")) {{
             row.classList.toggle("hidden");
         }}
     }});
 }}
-
 </script>
 '''
 
