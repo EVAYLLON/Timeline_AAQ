@@ -11,9 +11,10 @@ STATUS_COLORS = {
     "Vencido": "#C62828"
 }
 
+# ✅ AJUSTE CLAVE: tareas sin negrita
 LEVEL_STYLES = {
     "Proyecto": {"indent": 0, "font_weight": "700", "bar_height": 22, "icon": "▾"},
-    "Tarea": {"indent": 20, "font_weight": "600", "bar_height": 18, "icon": "•"},
+    "Tarea": {"indent": 20, "font_weight": "400", "bar_height": 18, "icon": "•"},
     "Subtarea": {"indent": 42, "font_weight": "400", "bar_height": 14, "icon": "◦"}
 }
 
@@ -60,7 +61,7 @@ def build_ms_project_gantt_html(df, start_date=None, end_date=None):
         </div>
         '''
 
-    # ✅ NO TOCAR
+    # ✅ EJE X ORIGINAL SIN CAMBIOS
     day_headers = ""
     for i in range(total_days + 1):
         d = min_date + pd.Timedelta(days=i)
@@ -104,8 +105,10 @@ def build_ms_project_gantt_html(df, start_date=None, end_date=None):
         <div class="gantt-row {'project-row' if is_project else ''}" data-project="{project_id}">
         
             <div class="task-table">
-                <div style="padding-left:{style["indent"]}px; font-weight:{style["font_weight"]}; cursor:pointer;" {click}>
-                    {style["icon"]} {escape(str(row["item_name"]))}
+
+                <div class="task-name" style="padding-left:{style["indent"]}px;" {click}>
+                    <span class="icon">{style["icon"]}</span>
+                    {escape(str(row["item_name"]))}
                 </div>
 
                 <div>{escape(str(row["responsible"]))}</div>
@@ -120,11 +123,14 @@ def build_ms_project_gantt_html(df, start_date=None, end_date=None):
                 </div>
 
                 <div>{_safe_link(row.get("document_url", ""))}</div>
+
             </div>
 
             <div class="timeline-cell">
                 <div class="bar" style="left:{left:.2f}%; width:{width:.2f}%; height:{style["bar_height"]}px; background:{color};">
+
                     <div class="bar-progress" style="width:{row["progress"]}%"></div>
+
                 </div>
             </div>
 
@@ -135,18 +141,19 @@ def build_ms_project_gantt_html(df, start_date=None, end_date=None):
     html = f'''
 <style>
 
-/* ✅ TIPOGRAFÍA MODERNA */
+/* ✅ TIPOGRAFÍA PROFESIONAL */
 .gantt-wrapper {{
-    font-family: "Segoe UI", Roboto, -apple-system, BlinkMacSystemFont, sans-serif;
-    font-size: 12px;
+    font-family: "Inter", "Segoe UI", Roboto, Arial, sans-serif;
+    font-size: 13px;
+    color: #1f2937;
     border: 1px solid #ccc;
     width: 100%;
-    overflow: hidden;   /* ✅ elimina scroll */
+    overflow: hidden;
 }}
 
 .gantt-header {{
     display: grid;
-    grid-template-columns: 700px auto;  /* ✅ más flexible */
+    grid-template-columns: 700px auto;
     background: #e5e7eb;
 }}
 
@@ -158,19 +165,35 @@ def build_ms_project_gantt_html(df, start_date=None, end_date=None):
 
 .gantt-row {{
     display: grid;
-    grid-template-columns: 700px auto;  /* ✅ clave responsive */
+    grid-template-columns: 700px auto;
 }}
 
 .task-table {{
     display: grid;
     grid-template-columns: 220px 120px 90px 90px 65px 105px 70px;
-    font-size: 12px;
+    font-size: 12.5px;
+}}
+
+/* ✅ DIFERENCIACIÓN CLAVE */
+.project-row .task-name {{
+    font-weight: 700;
+    color: #111827;
+}}
+
+.gantt-row:not(.project-row) .task-name {{
+    font-weight: 400;
+    color: #374151;
+}}
+
+/* ✅ refinamiento visual */
+.task-name {{
+    letter-spacing: 0.2px;
 }}
 
 .timeline-header,
 .timeline-cell {{
-    position: relative;
     width: 100%;
+    position: relative;
 }}
 
 .timeline-header {{
@@ -179,13 +202,8 @@ def build_ms_project_gantt_html(df, start_date=None, end_date=None):
 
 .timeline-cell {{
     height: 32px;
-    overflow: hidden;  /* ✅ evita desbordes */
-    background: repeating-linear-gradient(
-        to right,
-        #ffffff 0px,
-        #ffffff 19px,
-        #e5e7eb 20px
-    );
+    overflow: hidden;
+    background: repeating-linear-gradient(to right,#fff 0,#fff 19px,#e5e7eb 20px);
 }}
 
 .month-header {{
@@ -224,6 +242,7 @@ def build_ms_project_gantt_html(df, start_date=None, end_date=None):
     color:white;
     padding:2px 6px;
     border-radius:6px;
+    font-size:11px;
 }}
 
 .today-line {{
