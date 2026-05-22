@@ -192,8 +192,10 @@ if st.button("Exportar HTML"):
 # ======================
 # GANTT
 # ======================
-zoom = st.selectbox("Zoom", ["Proyecto completo","30 días","60 días"])
 
-html = build_ms_project_gantt_html(full_df, zoom=zoom)
+start_date = st.date_input("Inicio", value=full_df["start_date"].min())
+end_date = st.date_input("Fin", value=full_df["end_date"].max())
+
+html = build_ms_project_gantt_html(full_df, start_date, end_date)
 
 components.html(html, height=600, scrolling=True)
