@@ -24,7 +24,8 @@ def _safe_link(url):
     return ""
 
 
-def build_ms_project_gantt_html(df, start_date=None, end_date=None):
+# ✅ IMPORTANTE: agregamos zoom=None para compatibilidad
+def build_ms_project_gantt_html(df, start_date=None, end_date=None, zoom=None):
 
     if df.empty:
         return "<h3>⚠️ No hay datos</h3>"
@@ -39,23 +40,24 @@ def build_ms_project_gantt_html(df, start_date=None, end_date=None):
     if pd.isna(data_min) or pd.isna(data_max):
         return "<h3>⚠️ No hay fechas válidas</h3>"
 
-    # ✅ DEFINICIÓN SEGURA DEL RANGO
+    # ✅ si no pasas fechas → usa todo el proyecto (como antes)
     min_date = pd.to_datetime(start_date) if start_date else data_min
     max_date = pd.to_datetime(end_date) if end_date else data_max
 
-    # ✅ CORRECCIÓN CLAVE
+    # ✅ evitar errores de orden
     if min_date > max_date:
         min_date, max_date = max_date, min_date
 
     total_days = max((max_date - min_date).days, 1)
     today = datetime.today()
 
-    # ================= HEADER =================
+    # ===== MESES =====
     months = pd.date_range(min_date, max_date, freq="MS")
     month_headers = ""
 
     for m in months:
         next_m = m + pd.offsets.MonthBegin(1)
+
         left = ((m - min_date).days / total_days) * 100
         width = ((next_m - m).days / total_days) * 100
 
@@ -65,11 +67,12 @@ def build_ms_project_gantt_html(df, start_date=None, end_date=None):
         </div>
         '''
 
+    # ✅ NO SE TOCA (tu eje X original)
     day_headers = ""
     for i in range(total_days + 1):
         d = min_date + pd.Timedelta(days=i)
-        left = ((i + 0.5) / total_days) * 100
 
+        left = ((i + 0.5) / total_days) * 100
         cls = "day-label day-today" if d.date() == today.date() else "day-label"
 
         day_headers += f'''
@@ -80,7 +83,7 @@ def build_ms_project_gantt_html(df, start_date=None, end_date=None):
 
     today_pos = ((today - min_date).days / total_days) * 100
 
-    # ================= FILAS =================
+    # ===== FILAS =====
     rows_html = ""
 
     for _, row in df.iterrows():
@@ -88,21 +91,20 @@ def build_ms_project_gantt_html(df, start_date=None, end_date=None):
         if pd.isna(row["start_date"]) or pd.isna(row["end_date"]):
             continue
 
+        # ✅ ignorar tareas fuera del rango visible
+        if row["end_date"] < min_date or row["start_date"] > max_date:
+            continue
+
         style = LEVEL_STYLES.get(row["nivel"], LEVEL_STYLES["Subtarea"])
         color = STATUS_COLORS.get(row["timeline_status"], "#607D8B")
 
-        # ✅ recorte visual CONTROLADO
         start = max(row["start_date"], min_date)
         end = min(row["end_date"], max_date)
-
-        # ✅ si tarea queda fuera completamente → no dibujar
-        if end < min_date or start > max_date:
-            continue
 
         left_days = (start - min_date).days
         duration_days = max((end - start).days, 1)
 
-        left = max((left_days / total_days) * 100, 0)
+        left = (left_days / total_days) * 100
         width = max((duration_days / total_days) * 100, 1.5)
 
         project_id = escape(str(row.get("project_name", "Sin Proyecto")))
@@ -148,11 +150,9 @@ def build_ms_project_gantt_html(df, start_date=None, end_date=None):
         </div>
         '''
 
-    # ================= HTML =================
+    # ===== HTML =====
     html = f'''
 <style>
-body {{ font-family: Arial; }}
-
 .gantt-wrapper {{
     border:1px solid #ccc;
     overflow-x:auto;
@@ -247,11 +247,9 @@ body {{ font-family: Arial; }}
     background:red;
     left:{today_pos:.2f}%;
 }}
-
 </style>
 
 <div class="gantt-wrapper">
-
     <div class="gantt-header">
         <div class="table-header">
             <div>Proyecto</div>
@@ -271,7 +269,6 @@ body {{ font-family: Arial; }}
     </div>
 
     {rows_html}
-
 </div>
 
 <script>
