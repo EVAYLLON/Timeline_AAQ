@@ -3,6 +3,7 @@ from html import escape
 import pandas as pd
 from datetime import datetime
 
+
 STATUS_COLORS = {
     "Completado": "#2E7D32",
     "En plazo": "#1976D2",
@@ -23,36 +24,35 @@ def _safe_link(url):
     return ""
 
 
-def build_ms_project_gantt_html(df, zoom="Proyecto completo"):
+def build_ms_project_gantt_html(df, start_date=None, end_date=None):
 
     if df.empty:
-        return "<h3>⚠️ No hay datos para mostrar</h3>"
+        return "<h3>⚠️ No hay datos</h3>"
 
     df = df.copy()
     df["start_date"] = pd.to_datetime(df["start_date"], errors="coerce")
     df["end_date"] = pd.to_datetime(df["end_date"], errors="coerce")
 
-    min_date = df["start_date"].min()
-    max_date = df["end_date"].max()
+    data_min = df["start_date"].min()
+    data_max = df["end_date"].max()
 
-    if pd.isna(min_date) or pd.isna(max_date):
+    if pd.isna(data_min) or pd.isna(data_max):
         return "<h3>⚠️ No hay fechas válidas</h3>"
 
-    # ✅ Zoom (igual que antes)
-    if zoom == "30 días":
-        max_date = min_date + pd.Timedelta(days=30)
-    elif zoom == "60 días":
-        max_date = min_date + pd.Timedelta(days=60)
+    # ✅ usar inputs si existen
+    min_date = pd.to_datetime(start_date) if start_date else data_min
+    max_date = pd.to_datetime(end_date) if end_date else data_max
 
     total_days = max((max_date - min_date).days, 1)
     today = datetime.today()
 
-    # ================= HEADER TIEMPO =================
+    # ================= HEADER MESES =================
     months = pd.date_range(min_date, max_date, freq="MS")
     month_headers = ""
 
     for m in months:
         next_m = m + pd.offsets.MonthBegin(1)
+
         left = ((m - min_date).days / total_days) * 100
         width = ((next_m - m).days / total_days) * 100
 
@@ -62,11 +62,15 @@ def build_ms_project_gantt_html(df, zoom="Proyecto completo"):
         </div>
         '''
 
+    # ✅ ESTE BLOQUE NO SE TOCA (LO MANTENEMOS EXACTO)
     day_headers = ""
     for i in range(total_days + 1):
         d = min_date + pd.Timedelta(days=i)
+
         left = ((i + 0.5) / total_days) * 100
-        cls = "day-label day-today" if d.date() == today.date() else "day-label"
+
+        is_today = d.date() == today.date()
+        cls = "day-label day-today" if is_today else "day-label"
 
         day_headers += f'''
         <div class="{cls}" style="left:{left:.2f}%;">
@@ -84,8 +88,12 @@ def build_ms_project_gantt_html(df, zoom="Proyecto completo"):
         style = LEVEL_STYLES.get(row["nivel"], LEVEL_STYLES["Subtarea"])
         color = STATUS_COLORS.get(row["timeline_status"], "#607D8B")
 
+        # ✅ recorte visual (NO filtramos)
         start = max(row["start_date"], min_date)
         end = min(row["end_date"], max_date)
+
+        if pd.isna(start) or pd.isna(end):
+            continue
 
         left = ((start - min_date).days / total_days) * 100
         width = max(((end - start).days / total_days) * 100, 1.5)
@@ -134,7 +142,7 @@ def build_ms_project_gantt_html(df, zoom="Proyecto completo"):
         </div>
         '''
 
-    # ================= HTML FINAL =================
+    # ================= HTML =================
     html = f'''
 <style>
 
@@ -147,6 +155,7 @@ body {{
     background:#f3f4f6;
     display:flex;
     gap:10px;
+    align-items:center;
 }}
 
 .gantt-wrapper {{
@@ -177,24 +186,34 @@ body {{
     font-size:12px;
 }}
 
+.timeline-header {{
+    position:relative;
+    height:45px;
+}}
+
 .timeline-cell {{
     position:relative;
     height:32px;
-    background: repeating-linear-gradient(to right,#fff 0,#fff 19px,#e5e7eb 20px);
+    background: repeating-linear-gradient(
+        to right,
+        #ffffff 0px,
+        #ffffff 19px,
+        #e5e7eb 20px
+    );
 }}
 
 .month-header {{
     position:absolute;
     top:0;
     font-size:11px;
-    text-align:center;
     font-weight:600;
+    text-align:center;
 }}
 
 .day-label {{
     position:absolute;
     bottom:2px;
-    transform:translateX(-50%);
+    transform: translateX(-50%);
     font-size:11px;
 }}
 
@@ -210,6 +229,11 @@ body {{
     border-radius:4px;
 }}
 
+.bar-progress {{
+    height:100%;
+    background: rgba(255,255,255,0.4);
+}}
+
 .status-pill {{
     color:white;
     padding:2px 6px;
@@ -222,9 +246,9 @@ body {{
 
 .today-line {{
     position:absolute;
-    width:2px;
     top:0;
     bottom:0;
+    width:2px;
     background:red;
     left:{today_pos:.2f}%;
 }}
@@ -234,8 +258,9 @@ body {{
 <div class="controls">
     <label>Inicio:</label>
     <input type="date" id="startDate">
-    <button onclick="setToday()">Hoy</button>
-    <button onclick="setMonthStart()">Inicio Mes</button>
+    
+    <label>Fin:</label>
+    <input type="date" id="endDate">
 </div>
 
 <div class="gantt-wrapper">
@@ -272,16 +297,6 @@ function toggleProject(project) {{
             row.classList.toggle("hidden");
         }}
     }});
-}}
-
-function setToday() {{
-    document.getElementById("startDate").value = new Date().toISOString().split('T')[0];
-}}
-
-function setMonthStart() {{
-    let d = new Date();
-    d.setDate(1);
-    document.getElementById("startDate").value = d.toISOString().split('T')[0];
 }}
 
 </script>
