@@ -26,86 +26,51 @@ def _safe_link(url):
 def build_ms_project_gantt_html(df, zoom="Proyecto completo"):
 
     if df.empty:
-        df = pd.DataFrame([{
-            "nivel": "Proyecto",
-            "project_name": "",
-            "item_name": "",
-            "responsible": "",
-            "start_date": "",
-            "end_date": "",
-            "progress": 0,
-            "estado": "",
-            "document_url": ""
-        }])
-
-
-    data = df.copy()
-    data["start_date"] = pd.to_datetime(data["start_date"])
-    data["end_date"] = pd.to_datetime(data["end_date"])
+        return "<h3>⚠️ No hay datos para mostrar</h3>"
 
     df = df.copy()
-
     df["start_date"] = pd.to_datetime(df["start_date"], errors="coerce")
     df["end_date"] = pd.to_datetime(df["end_date"], errors="coerce")
 
+    min_date = df["start_date"].min()
+    max_date = df["end_date"].max()
 
-    min_date = df["start_date"].dropna().min()
-    max_date = df["end_date"].dropna().max()
-
-    # ✅ protección crítica
     if pd.isna(min_date) or pd.isna(max_date):
-        return "<h3>⚠️ No hay fechas válidas para mostrar el Gantt</h3>"
+        return "<h3>⚠️ No hay fechas válidas</h3>"
 
+    # ✅ zoom mantiene lógica original
     if zoom == "30 días":
         max_date = min_date + pd.Timedelta(days=30)
     elif zoom == "60 días":
         max_date = min_date + pd.Timedelta(days=60)
 
-    data = data[(data["end_date"] >= min_date) & (data["start_date"] <= max_date)]
-
     total_days = max((max_date - min_date).days, 1)
     today = datetime.today()
 
-    # ===== MESES =====
+    # ===== HEADER TIEMPO =====
     months = pd.date_range(min_date, max_date, freq="MS")
     month_headers = ""
-
     for m in months:
         next_m = m + pd.offsets.MonthBegin(1)
-
         left = ((m - min_date).days / total_days) * 100
         width = ((next_m - m).days / total_days) * 100
+        month_headers += f'<div class="month-header" style="left:{left:.2f}%; width:{width:.2f}%;">{m.strftime("%b %Y")}</div>'
 
-        month_headers += f'''
-        <div class="month-header" style="left:{left:.2f}%; width:{width:.2f}%;">
-            {m.strftime("%b %Y")}
-        </div>
-        '''
-
-    # ===== DÍAS =====
     day_headers = ""
     for i in range(total_days + 1):
         d = min_date + pd.Timedelta(days=i)
-
-        # ✅ centrado perfecto en la celda
         left = ((i + 0.5) / total_days) * 100
+        cls = "day-label day-today" if d.date() == today.date() else "day-label"
+        day_headers += f'<div class="{cls}" style="left:{left:.2f}%;">{d.day}</div>'
 
-        is_today = d.date() == today.date()
-        cls = "day-label day-today" if is_today else "day-label"
-
-        day_headers += f'''
-        <div class="{cls}" style="left:{left:.2f}%;">
-            {d.day}
-        </div>
-        '''
-
-    # ===== línea HOY =====
     today_pos = ((today - min_date).days / total_days) * 100
 
     # ===== FILAS =====
     rows_html = ""
+    current_project = ""
 
-    for _, row in data.iterrows():
+    for _, row in df.iterrows():
+
         style = LEVEL_STYLES.get(row["nivel"], LEVEL_STYLES["Subtarea"])
         color = STATUS_COLORS.get(row["timeline_status"], "#607D8B")
 
@@ -115,16 +80,21 @@ def build_ms_project_gantt_html(df, zoom="Proyecto completo"):
         left = ((start - min_date).days / total_days) * 100
         width = max(((end - start).days / total_days) * 100, 1.5)
 
-        progress_width = max(min(float(row["progress"]), 100), 0)
-        link_html = _safe_link(row.get("document_url", ""))
+        project_id = escape(str(row.get("project_name", "Sin Proyecto")))
+
+        # Identificar proyecto
+        is_project = row["nivel"] == "Proyecto"
+
+        icon = style["icon"]
+        click = f'onclick="toggleProject(\'{project_id}\')"' if is_project else ""
 
         rows_html += f'''
-        <div class="gantt-row">
-
+        <div class="gantt-row {'project-row' if is_project else 'task-row'}" data-project="{project_id}">
+        
             <div class="task-table">
 
-                <div style="padding-left:{style["indent"]}px; font-weight:{style["font_weight"]};">
-                    {style["icon"]} {escape(str(row["item_name"]))}
+                <div style="padding-left:{style["indent"]}px; font-weight:{style["font_weight"]}; cursor:pointer;" {click}>
+                    <span class="expander">{icon}</span> {escape(str(row["item_name"]))}
                 </div>
 
                 <div>{escape(str(row["responsible"]))}</div>
@@ -134,22 +104,17 @@ def build_ms_project_gantt_html(df, zoom="Proyecto completo"):
 
                 <div>
                     <span class="status-pill" style="background:{color};">
-                        {escape(row["timeline_status"])}
+                        {escape(str(row["timeline_status"]))}
                     </span>
                 </div>
 
-                <div class="task-link">{link_html}</div>
+                <div>{_safe_link(row.get("document_url", ""))}</div>
 
             </div>
 
             <div class="timeline-cell">
-                <div class="bar" style="
-                    left:{left:.2f}%;
-                    width:{width:.2f}%;
-                    height:{style["bar_height"]}px;
-                    background:{color};
-                ">
-                    <div class="bar-progress" style="width:{progress_width:.2f}%;"></div>
+                <div class="bar" style="left:{left:.2f}%; width:{width:.2f}%; height:{style["bar_height"]}px; background:{color};">
+                    <div class="bar-progress" style="width:{row["progress"]}%;"></div>
                 </div>
             </div>
 
@@ -159,139 +124,119 @@ def build_ms_project_gantt_html(df, zoom="Proyecto completo"):
     html = f'''
 <style>
 
-/* ✅ TIPOGRAFÍA EXACTA */
+body {{ font-family: Arial; }}
+
+.controls {{
+    padding:10px;
+    background:#f3f4f6;
+    display:flex;
+    gap:10px;
+    align-items:center;
+}}
+
 .gantt-wrapper {{
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI",
-                 Roboto, Helvetica, Arial, sans-serif;
-    border: 1px solid #ccc;
+    border:1px solid #ccc;
 }}
 
 .gantt-header {{
-    display: grid;
-    grid-template-columns: 740px 1fr;
-    background: #e5e7eb;
+    display:grid;
+    grid-template-columns:740px 1fr;
+    background:#e5e7eb;
 }}
 
 .table-header {{
-    display: grid;
-    grid-template-columns: 220px 120px 90px 90px 65px 105px 70px;
-    font-weight: 600;
-}}
-
-.table-header div,
-.task-table > div {{
-    padding: 6px 8px;
+    display:grid;
+    grid-template-columns:220px 120px 90px 90px 65px 105px 70px;
+    font-weight:600;
 }}
 
 .gantt-row {{
-    display: grid;
-    grid-template-columns: 740px 1fr;
-    min-height: 32px;
-    align-items: center;
+    display:grid;
+    grid-template-columns:740px 1fr;
 }}
 
 .task-table {{
-    display: grid;
-    grid-template-columns: 220px 120px 90px 90px 65px 105px 70px;
-    font-size: 12px;
-}}
-
-.timeline-header {{
-    position: relative;
-    height: 45px;
+    display:grid;
+    grid-template-columns:220px 120px 90px 90px 65px 105px 70px;
+    font-size:12px;
 }}
 
 .timeline-cell {{
-    position: relative;
-    height: 32px;
-
-    /* ✅ grid de días */
-    background: repeating-linear-gradient(
-        to right,
-        #ffffff 0px,
-        #ffffff 19px,
-        #e5e7eb 20px
-    );
-}}
-
-.month-header {{
-    position: absolute;
-    top: 0;
-    font-size: 11px;
-    font-weight: 600;
-    text-align: center;
-}}
-
-.day-label {{
-    position: absolute;
-    bottom: 2px;                     /* ✅ clave */
-    transform: translateX(-50%);
-    font-size: 11px;
-    color: #4b5563;
-}}
-
-.day-today {{
-    color: red;
-    font-weight: bold;
+    position:relative;
+    height:32px;
+    background: repeating-linear-gradient(to right,#fff 0,#fff 19px,#e5e7eb 20px);
 }}
 
 .bar {{
-    position: absolute;
-    top: 50%;
-    transform: translateY(-50%);
-    border-radius: 4px;
-}}
-
-.bar-progress {{
-    height: 100%;
-    background: rgba(255,255,255,0.4);
+    position:absolute;
+    top:50%;
+    transform:translateY(-50%);
+    border-radius:4px;
 }}
 
 .status-pill {{
-    color: white;
-    padding: 2px 6px;
-    border-radius: 6px;
+    color:white;
+    padding:2px 6px;
+    border-radius:6px;
 }}
 
-.task-link a {{
-    color: #1d4ed8;
-    text-decoration: none;
-}}
-
-.today-line {{
-    position: absolute;
-    top: 0;
-    bottom: 0;
-    width: 2px;
-    background: red;
-    left: {today_pos:.2f}%;
+.task-row.hidden {{
+    display:none;
 }}
 
 </style>
+
+<div class="controls">
+
+    <label>Inicio:</label>
+    <input type="date" id="startDate">
+
+    <button onclick="setToday()">Hoy</button>
+    <button onclick="setMonthStart()">Inicio Mes</button>
+
+</div>
 
 <div class="gantt-wrapper">
 
     <div class="gantt-header">
         <div class="table-header">
-            <div>Proyecto</div>
-            <div>Responsable</div>
-            <div>Inicio</div>
-            <div>Fin</div>
-            <div>Avance</div>
-            <div>Estado</div>
-            <div>Link</div>
+            <div>Proyecto</div><div>Responsable</div><div>Inicio</div>
+            <div>Fin</div><div>Avance</div><div>Estado</div><div>Link</div>
         </div>
-
         <div class="timeline-header">
             {month_headers}
             {day_headers}
-            <div class="today-line"></div>
+            <div class="today-line" style="left:{today_pos:.2f}%"></div>
         </div>
     </div>
 
     {rows_html}
 
 </div>
+
+<script>
+
+function toggleProject(project) {{
+    const rows = document.querySelectorAll('[data-project="' + project + '"]');
+
+    rows.forEach((row, index) => {{
+        if(index !== 0) {{
+            row.classList.toggle("hidden");
+        }}
+    }});
+}}
+
+function setToday() {{
+    document.getElementById("startDate").value = new Date().toISOString().split('T')[0];
+}}
+
+function setMonthStart() {{
+    let d = new Date();
+    d.setDate(1);
+    document.getElementById("startDate").value = d.toISOString().split('T')[0];
+}}
+
+</script>
 '''
 
     return html
