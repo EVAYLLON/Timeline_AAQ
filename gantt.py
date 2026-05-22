@@ -60,7 +60,7 @@ def build_ms_project_gantt_html(df, start_date=None, end_date=None):
         </div>
         '''
 
-    # ✅ NO TOCAR (tu eje X perfecto)
+    # ✅ NO TOCAR
     day_headers = ""
     for i in range(total_days + 1):
         d = min_date + pd.Timedelta(days=i)
@@ -135,16 +135,18 @@ def build_ms_project_gantt_html(df, start_date=None, end_date=None):
     html = f'''
 <style>
 
-/* ✅ TIPOGRAFÍA ORIGINAL RESTAURADA */
+/* ✅ TIPOGRAFÍA MODERNA */
 .gantt-wrapper {{
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI",
-                 Roboto, Helvetica, Arial, sans-serif;
+    font-family: "Segoe UI", Roboto, -apple-system, BlinkMacSystemFont, sans-serif;
+    font-size: 12px;
     border: 1px solid #ccc;
+    width: 100%;
+    overflow: hidden;   /* ✅ elimina scroll */
 }}
 
 .gantt-header {{
     display: grid;
-    grid-template-columns: 740px 1fr;
+    grid-template-columns: 700px auto;  /* ✅ más flexible */
     background: #e5e7eb;
 }}
 
@@ -156,7 +158,7 @@ def build_ms_project_gantt_html(df, start_date=None, end_date=None):
 
 .gantt-row {{
     display: grid;
-    grid-template-columns: 740px 1fr;
+    grid-template-columns: 700px auto;  /* ✅ clave responsive */
 }}
 
 .task-table {{
@@ -165,21 +167,32 @@ def build_ms_project_gantt_html(df, start_date=None, end_date=None):
     font-size: 12px;
 }}
 
-.timeline-header {{
+.timeline-header,
+.timeline-cell {{
     position: relative;
+    width: 100%;
+}}
+
+.timeline-header {{
     height: 45px;
 }}
 
 .timeline-cell {{
-    position: relative;
     height: 32px;
-    background: repeating-linear-gradient(to right,#fff 0,#fff 19px,#e5e7eb 20px);
+    overflow: hidden;  /* ✅ evita desbordes */
+    background: repeating-linear-gradient(
+        to right,
+        #ffffff 0px,
+        #ffffff 19px,
+        #e5e7eb 20px
+    );
 }}
 
 .month-header {{
     position:absolute;
     top:0;
     font-size:11px;
+    font-weight:600;
     text-align:center;
 }}
 
@@ -199,6 +212,18 @@ def build_ms_project_gantt_html(df, start_date=None, end_date=None):
     position:absolute;
     top:50%;
     transform:translateY(-50%);
+    border-radius:4px;
+}}
+
+.bar-progress {{
+    height:100%;
+    background: rgba(255,255,255,0.35);
+}}
+
+.status-pill {{
+    color:white;
+    padding:2px 6px;
+    border-radius:6px;
 }}
 
 .today-line {{
