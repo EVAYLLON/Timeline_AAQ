@@ -104,7 +104,7 @@ else:
     proyectos = []
 
 
-selected = st.selectbox("Proyecto", proyectos) if len(proyectos) > 0 else None
+
 
 # ======================
 # CREAR PROYECTO CON NOMBRE
@@ -137,7 +137,7 @@ if len(proyectos) == 0:
     st.warning("⚠️ No hay proyectos. Crea uno 👇")
     selected = None
 else:
-    selected = st.selectbox("Proyecto", proyectos)
+    selected = st.selectbox("Proyecto", proyectos, key="select_proyecto")
 
 # ======================
 # BOTONES
