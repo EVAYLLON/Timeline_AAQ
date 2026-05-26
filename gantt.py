@@ -11,7 +11,6 @@ STATUS_COLORS = {
     "Vencido": "#C62828"
 }
 
-# ✅ AJUSTE CLAVE: tareas sin negrita
 LEVEL_STYLES = {
     "Proyecto": {"indent": 0, "font_weight": "700", "bar_height": 22, "icon": "▾"},
     "Tarea": {"indent": 20, "font_weight": "400", "bar_height": 18, "icon": "•"},
@@ -61,7 +60,7 @@ def build_ms_project_gantt_html(df, start_date=None, end_date=None):
         </div>
         '''
 
-    # ✅ EJE X ORIGINAL SIN CAMBIOS
+    # ===== DIAS =====
     day_headers = ""
     for i in range(total_days + 1):
         d = min_date + pd.Timedelta(days=i)
@@ -101,13 +100,20 @@ def build_ms_project_gantt_html(df, start_date=None, end_date=None):
 
         click = f'onclick="toggleProject(\'{project_id}\')"' if is_project else ""
 
+        # 👇 CLASE PARA COLAPSO
+        row_class = "gantt-row"
+        if is_project:
+            row_class += " project-row"
+        else:
+            row_class += " project-child"
+
         rows_html += f'''
-        <div class="gantt-row {'project-row' if is_project else ''}" data-project="{project_id}">
+        <div class="{row_class}" data-project="{project_id}">
         
             <div class="task-table">
 
                 <div class="task-name" style="padding-left:{style["indent"]}px;" {click}>
-                    <span class="icon">{style["icon"]} <span style="color:blue;">{escape(str(row["item_name"]))}</span>
+                    <span class="icon">{style["icon"]}</span>
                     {escape(str(row["item_name"]))}
                 </div>
 
@@ -128,9 +134,7 @@ def build_ms_project_gantt_html(df, start_date=None, end_date=None):
 
             <div class="timeline-cell">
                 <div class="bar" style="left:{left:.2f}%; width:{width:.2f}%; height:{style["bar_height"]}px; background:{color};">
-
                     <div class="bar-progress" style="width:{row["progress"]}%"></div>
-
                 </div>
             </div>
 
@@ -141,14 +145,10 @@ def build_ms_project_gantt_html(df, start_date=None, end_date=None):
     html = f'''
 <style>
 
-/* ✅ TIPOGRAFÍA PROFESIONAL */
 .gantt-wrapper {{
-    font-family: "Inter", "Segoe UI", Roboto, Arial, sans-serif;
+    font-family: "Segoe UI", Arial;
     font-size: 13px;
-    color: #1f2937;
     border: 1px solid #ccc;
-    width: 100%;
-    overflow: hidden;
 }}
 
 .gantt-header {{
@@ -171,28 +171,18 @@ def build_ms_project_gantt_html(df, start_date=None, end_date=None):
 .task-table {{
     display: grid;
     grid-template-columns: 220px 120px 90px 90px 65px 105px 70px;
-    font-size: 12.5px;
 }}
 
-/* ✅ DIFERENCIACIÓN CLAVE */
 .project-row .task-name {{
     font-weight: 700;
-    color: #111827;
 }}
 
-.gantt-row:not(.project-row) .task-name {{
-    font-weight: 400;
-    color: #374151;
-}}
-
-/* ✅ refinamiento visual */
-.task-name {{
-    letter-spacing: 0.2px;
+.project-child {{
+    display: grid;
 }}
 
 .timeline-header,
 .timeline-cell {{
-    width: 100%;
     position: relative;
 }}
 
@@ -202,7 +192,6 @@ def build_ms_project_gantt_html(df, start_date=None, end_date=None):
 
 .timeline-cell {{
     height: 32px;
-    overflow: hidden;
     background: repeating-linear-gradient(to right,#fff 0,#fff 19px,#e5e7eb 20px);
 }}
 
@@ -210,14 +199,11 @@ def build_ms_project_gantt_html(df, start_date=None, end_date=None):
     position:absolute;
     top:0;
     font-size:11px;
-    font-weight:600;
-    text-align:center;
 }}
 
 .day-label {{
     position:absolute;
     bottom:2px;
-    transform: translateX(-50%);
     font-size:11px;
 }}
 
@@ -284,7 +270,7 @@ def build_ms_project_gantt_html(df, start_date=None, end_date=None):
 function toggleProject(project) {{
     const rows = document.querySelectorAll('[data-project="' + project + '"]');
     rows.forEach(row => {{
-        if (!row.classList.contains("project-row")) {{
+        if (row.classList.contains("project-child")) {{
             row.style.display = row.style.display === "none" ? "grid" : "none";
         }}
     }});
