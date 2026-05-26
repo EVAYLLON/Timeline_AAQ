@@ -14,7 +14,7 @@ SUPABASE_KEY = "sb_publishable_Kjb0Rhsp_tWeWxdof7-zWA_htBXB3MP"
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 # ======================
-# CARGAR
+# CARGAR DATOS
 # ======================
 def cargar():
     res = supabase.table("projects").select("*").execute()
@@ -28,7 +28,6 @@ def cargar():
 
     df = pd.DataFrame(data)
 
-    # asegurar columnas
     for col in [
         "nivel","project_name","item_name","responsible",
         "start_date","end_date","progress","estado","document_url"
@@ -43,16 +42,20 @@ def cargar():
 # ======================
 def guardar(df):
 
+    df = df.copy()
+
     df = df.replace({pd.NA: None})
     df = df.where(df.notnull(), None)
 
+    # evitar duplicados
     df = df.drop_duplicates(
         subset=["project_name","item_name","nivel"],
         keep="last"
     )
 
-    df["start_date"] = pd.to_datetime(df["start_date"], errors="coerce")
-    df["end_date"] = pd.to_datetime(df["end_date"], errors="coerce")
+    # ✅ convertir fechas a string (CRÍTICO)
+    df["start_date"] = pd.to_datetime(df["start_date"], errors="coerce").dt.strftime("%Y-%m-%d")
+    df["end_date"] = pd.to_datetime(df["end_date"], errors="coerce").dt.strftime("%Y-%m-%d")
 
     df["progress"] = pd.to_numeric(df["progress"], errors="coerce").fillna(0)
 
@@ -99,6 +102,7 @@ df = cargar()
 proyectos = df[df["nivel"] == "Proyecto"]["project_name"].unique()
 
 if len(proyectos) == 0:
+    st.warning("No hay proyectos. Crea uno 👇")
     selected = None
 else:
     selected = st.selectbox("Proyecto", proyectos)
@@ -143,9 +147,11 @@ with col2:
 
             guardar(pd.concat([df, new]))
             st.rerun()
+    else:
+        st.warning("Selecciona un proyecto")
 
 # ======================
-# BORRAR
+# BORRAR PROYECTO
 # ======================
 with col3:
     if selected and st.button("🗑️ Eliminar Proyecto"):
@@ -163,6 +169,7 @@ if selected:
         "nivel","item_name","responsible","start_date","end_date","progress","document_url"
     ]].copy()
 
+    # ✅ asegurar datetime para calendario
     df_edit["start_date"] = pd.to_datetime(df_edit["start_date"], errors="coerce")
     df_edit["end_date"] = pd.to_datetime(df_edit["end_date"], errors="coerce")
 
@@ -181,10 +188,15 @@ if selected:
 
     if st.button("💾 Guardar cambios"):
 
-        # ✅ detectar nombre del proyecto editado
-        nuevo_nombre = edited[edited["nivel"] == "Proyecto"]["item_name"].iloc[0]
+        # ✅ detectar nuevo nombre del proyecto
+        if (edited["nivel"] == "Proyecto").any():
+            nuevo_nombre = edited.loc[
+                edited["nivel"] == "Proyecto", "item_name"
+            ].iloc[0]
+        else:
+            nuevo_nombre = selected
 
-        # ✅ reescribir todo el bloque correctamente
+        # ✅ actualizar TODAS las filas
         edited["project_name"] = nuevo_nombre
 
         df_rest = df[df["project_name"] != selected]
@@ -193,7 +205,7 @@ if selected:
 
         guardar(df_total)
 
-        st.success("✅ Guardado")
+        st.success("✅ Guardado correctamente")
         st.rerun()
 
 # ======================
@@ -209,8 +221,15 @@ if not df.empty:
     start_series = pd.to_datetime(df["start_date"], errors="coerce").dropna()
     end_series = pd.to_datetime(df["end_date"], errors="coerce").dropna()
 
-    start_date = st.date_input("Inicio", value=start_series.min().date())
-    end_date = st.date_input("Fin", value=end_series.max().date())
+    start_date = st.date_input(
+        "Inicio",
+        value=start_series.min().date() if not start_series.empty else datetime.today().date()
+    )
+
+    end_date = st.date_input(
+        "Fin",
+        value=end_series.max().date() if not end_series.empty else datetime.today().date()
+    )
 
     html = build_ms_project_gantt_html(df, start_date, end_date)
 
