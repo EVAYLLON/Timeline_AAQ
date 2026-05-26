@@ -1,3 +1,4 @@
+
 from pathlib import Path
 import pandas as pd
 import streamlit as st
@@ -115,7 +116,7 @@ df["start_date"] = df["start_date"].dt.date
 df["end_date"] = df["end_date"].dt.date
 
 # ======================
-# ✅ BOTONES AGREGAR
+# BOTONES AGREGAR
 # ======================
 st.subheader("Gestión")
 
@@ -138,7 +139,10 @@ with col1:
 
 with col2:
     if st.button("➕ Agregar Tarea"):
-        project_name = df[df["nivel"] == "Proyecto"]["project_name"].iloc[0] if not df.empty else "Nuevo Proyecto"
+        if not df[df["nivel"] == "Proyecto"].empty:
+            project_name = df[df["nivel"] == "Proyecto"]["project_name"].iloc[0]
+        else:
+            project_name = "Nuevo Proyecto"
 
         new_row = {
             "nivel": "Tarea",
@@ -154,7 +158,7 @@ with col2:
         df = pd.concat([df, pd.DataFrame([new_row])], ignore_index=True)
 
 # ======================
-# ✅ EDITOR POR PROYECTO
+# EDITOR POR PROYECTO
 # ======================
 st.subheader("Editor por Proyecto")
 
@@ -164,7 +168,6 @@ df_display = df.drop(
 )
 
 projects_list = df_display["project_name"].dropna().unique()
-
 edited_blocks = []
 
 for project in projects_list:
@@ -191,48 +194,60 @@ for project in projects_list:
         edited_blocks.append(edited_proj)
 
 # ======================
-# ✅ RECONSTRUCCIÓN (FIX)
+# RECONSTRUCCIÓN SEGURA
 # ======================
-full_df = pd.concat(edited_blocks, ignore_index=True)
+if len(edited_blocks) == 0:
+    full_df = pd.DataFrame(columns=df_display.columns)
+else:
+    full_df = pd.concat(edited_blocks, ignore_index=True)
 
-full_df["start_date"] = pd.to_datetime(full_df["start_date"], errors="coerce")
-full_df["end_date"] = pd.to_datetime(full_df["end_date"], errors="coerce")
-full_df["progress"] = pd.to_numeric(full_df["progress"], errors="coerce").fillna(0)
+# ======================
+# LIMPIEZA
+# ======================
+if not full_df.empty:
+    full_df["start_date"] = pd.to_datetime(full_df["start_date"], errors="coerce")
+    full_df["end_date"] = pd.to_datetime(full_df["end_date"], errors="coerce")
+    full_df["progress"] = pd.to_numeric(full_df["progress"], errors="coerce").fillna(0)
 
-full_df["estado"] = full_df["progress"].apply(calcular_estado)
-full_df["timeline_status"] = full_df.apply(calcular_timeline, axis=1)
+    full_df["estado"] = full_df["progress"].apply(calcular_estado)
+    full_df["timeline_status"] = full_df.apply(calcular_timeline, axis=1)
 
 # ======================
 # ORDENAMIENTO
 # ======================
-orden = {"Proyecto": 0, "Tarea": 1, "Subtarea": 2}
-full_df["nivel_order"] = full_df["nivel"].map(orden)
+if not full_df.empty:
 
-proyectos = full_df[full_df["nivel"] == "Proyecto"]
-tareas = full_df[full_df["nivel"] != "Proyecto"]
+    orden = {"Proyecto": 0, "Tarea": 1, "Subtarea": 2}
+    full_df["nivel_order"] = full_df["nivel"].map(orden)
 
-df_ordenado = []
+    proyectos = full_df[full_df["nivel"] == "Proyecto"]
+    tareas = full_df[full_df["nivel"] != "Proyecto"]
 
-for _, proj in proyectos.iterrows():
-    df_ordenado.append(proj.to_dict())
+    df_ordenado = []
 
-    tareas_proj = tareas[tareas["project_name"] == proj["project_name"]]
-    tareas_proj = tareas_proj.sort_values(by=["nivel_order","start_date"])
+    for _, proj in proyectos.iterrows():
+        df_ordenado.append(proj.to_dict())
 
-    df_ordenado.extend(tareas_proj.to_dict("records"))
+        tareas_proj = tareas[tareas["project_name"] == proj["project_name"]]
+        tareas_proj = tareas_proj.sort_values(by=["nivel_order","start_date"])
 
-full_df = pd.DataFrame(df_ordenado).reset_index(drop=True)
+        df_ordenado.extend(tareas_proj.to_dict("records"))
+
+    full_df = pd.DataFrame(df_ordenado).reset_index(drop=True)
 
 # ======================
 # BOTONES
 # ======================
 if st.button("Guardar cambios"):
-    full_df["start_date"] = full_df["start_date"].astype(str)
-    full_df["end_date"] = full_df["end_date"].astype(str)
+    if not full_df.empty:
+        full_df["start_date"] = full_df["start_date"].astype(str)
+        full_df["end_date"] = full_df["end_date"].astype(str)
 
-    guardar_todo(full_df)
-    st.success("Guardado en Supabase ✅")
-    st.rerun()
+        guardar_todo(full_df)
+        st.success("Guardado en Supabase ✅")
+        st.rerun()
+    else:
+        st.warning("No hay datos para guardar")
 
 if st.button("Exportar HTML"):
     html = build_ms_project_gantt_html(full_df)
@@ -242,9 +257,13 @@ if st.button("Exportar HTML"):
 # ======================
 # GANTT
 # ======================
-start_date = st.date_input("Inicio", value=full_df["start_date"].min())
-end_date = st.date_input("Fin", value=full_df["end_date"].max())
+st.subheader("Timeline")
 
-html = build_ms_project_gantt_html(full_df, start_date, end_date)
+if full_df.empty:
+    st.warning("⚠️ No hay datos. Agrega un proyecto para comenzar.")
+else:
+    start_date = st.date_input("Inicio", value=full_df["start_date"].min())
+    end_date = st.date_input("Fin", value=full_df["end_date"].max())
 
-components.html(html, height=650, scrolling=False)
+    html = build_ms_project_gantt_html(full_df, start_date, end_date)
+    components.html(html, height=650, scrolling=False)
