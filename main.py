@@ -32,6 +32,7 @@ def cargar_datos():
 # GUARDAR DATOS
 # ======================
 def guardar_todo(df):
+
     supabase.table("projects").delete().gt("id", 0).execute()
 
     columnas_validas = [
@@ -114,26 +115,46 @@ df["start_date"] = df["start_date"].dt.date
 df["end_date"] = df["end_date"].dt.date
 
 # ======================
-# ✅ VISTA COLAPSABLE (CORRECTA)
+# ✅ BOTONES AGREGAR (NUEVO)
 # ======================
-st.subheader("Vista por Proyecto (colapsable)")
+st.subheader("Gestión")
 
-projects_list = df["project_name"].dropna().unique()
+col1, col2 = st.columns(2)
 
-for project in projects_list:
-    project_df = df[df["project_name"] == project]
+with col1:
+    if st.button("➕ Agregar Proyecto"):
+        new_row = {
+            "nivel": "Proyecto",
+            "project_name": "Nuevo Proyecto",
+            "item_name": "Nuevo Proyecto",
+            "responsible": "",
+            "start_date": pd.Timestamp.today().date(),
+            "end_date": pd.Timestamp.today().date(),
+            "progress": 0,
+            "estado": "",
+            "document_url": ""
+        }
+        df = pd.concat([df, pd.DataFrame([new_row])], ignore_index=True)
 
-    with st.expander(f"📁 {project}", expanded=False):
-        st.dataframe(
-            project_df.sort_values(by=["nivel","start_date"]),
-            use_container_width=True
-        )
+with col2:
+    if st.button("➕ Agregar Tarea"):
+        project_name = df[df["nivel"] == "Proyecto"]["project_name"].iloc[0] if not df.empty else "Nuevo Proyecto"
+
+        new_row = {
+            "nivel": "Tarea",
+            "project_name": project_name,
+            "item_name": "Nueva Tarea",
+            "responsible": "",
+            "start_date": pd.Timestamp.today().date(),
+            "end_date": pd.Timestamp.today().date(),
+            "progress": 0,
+            "estado": "",
+            "document_url": ""
+        }
+        df = pd.concat([df, pd.DataFrame([new_row])], ignore_index=True)
 
 # ======================
-# ✅ EDITOR ORIGINAL (NO SE TOCA)
-# ======================
-# ======================
-# ✅ EDITOR COLAPSABLE POR PROYECTO
+# ✅ EDITOR POR PROYECTO
 # ======================
 st.subheader("Editor por Proyecto")
 
@@ -143,7 +164,6 @@ df_display = df.drop(
 )
 
 projects_list = df_display["project_name"].dropna().unique()
-
 edited_blocks = []
 
 for project in projects_list:
@@ -157,12 +177,8 @@ for project in projects_list:
             num_rows="dynamic",
             use_container_width=True,
             key=f"editor_{project}",
-
             column_config={
-                "nivel": st.column_config.SelectboxColumn(
-                    "Nivel",
-                    options=["Proyecto","Tarea","Subtarea"]
-                ),
+                "nivel": st.column_config.SelectboxColumn("Nivel", options=["Proyecto","Tarea","Subtarea"]),
                 "start_date": st.column_config.DateColumn("Inicio"),
                 "end_date": st.column_config.DateColumn("Fin"),
                 "estado": st.column_config.TextColumn("Estado", disabled=True),
@@ -174,18 +190,15 @@ for project in projects_list:
         edited_blocks.append(edited_proj)
 
 # ======================
-# ✅ RECONSTRUCCION GLOBAL (CLAVE)
+# ✅ RECONSTRUCCIÓN GLOBAL (FIX)
 # ======================
 full_df = pd.concat(edited_blocks, ignore_index=True)
 
 # ======================
-# RECONSTRUCCION
+# LIMPIEZA
 # ======================
-full_df = edited_df.copy()
-
 full_df["start_date"] = pd.to_datetime(full_df["start_date"], errors="coerce")
 full_df["end_date"] = pd.to_datetime(full_df["end_date"], errors="coerce")
-
 full_df["progress"] = pd.to_numeric(full_df["progress"], errors="coerce").fillna(0)
 
 full_df["estado"] = full_df["progress"].apply(calcular_estado)
@@ -236,4 +249,4 @@ end_date = st.date_input("Fin", value=full_df["end_date"].max())
 
 html = build_ms_project_gantt_html(full_df, start_date, end_date)
 
-components.html(html, height=600, scrolling=True)
+components.html(html, height=650, scrolling=False)
