@@ -19,20 +19,27 @@ supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 # ======================
 def cargar():
     res = supabase.table("projects").select("*").execute()
-    df = pd.DataFrame(res.data if res.data else [])
+    data = res.data
 
-    if df.empty:
-        return df
+    # ✅ SI NO HAY DATOS → crear DF con columnas
+    if not data:
+        return pd.DataFrame(columns=[
+            "nivel","project_name","item_name","responsible",
+            "start_date","end_date","progress","estado","document_url"
+        ])
 
-    # ✅ limpiar tareas huérfanas (clave)
-    proyectos = df[df["nivel"] == "Proyecto"]["project_name"]
+    df = pd.DataFrame(data)
 
-    df = df[
-        (df["nivel"] == "Proyecto") |
-        (df["project_name"].isin(proyectos))
-    ]
+    # ✅ asegurar columnas (por si acaso)
+    for col in [
+        "nivel","project_name","item_name","responsible",
+        "start_date","end_date","progress","estado","document_url"
+    ]:
+        if col not in df.columns:
+            df[col] = None
 
     return df
+
 
 
 # ======================
@@ -100,6 +107,10 @@ st.title("Project Tracker (Limpio ✅)")
 
 df = cargar()
 
+if df.empty:
+    st.warning("No hay proyectos. Crea uno para empezar 👇")
+
+
 # ======================
 # PROYECTOS
 # ======================
@@ -108,7 +119,11 @@ proyectos = df[df["nivel"] == "Proyecto"]["project_name"].unique()
 if len(proyectos) == 0:
     st.warning("No hay proyectos")
 
-selected = st.selectbox("Proyecto", proyectos)
+if len(proyectos) == 0:
+    selected = None
+else:
+    selected = st.selectbox("Proyecto", proyectos)
+
 
 
 col1, col2, col3 = st.columns(3)
@@ -136,19 +151,24 @@ with col1:
 # NUEVA TAREA
 # ======================
 with col2:
-    if st.button("➕ Tarea"):
 
-        new = pd.DataFrame([{
-            "nivel": "Tarea",
-            "project_name": selected,
-            "item_name": "Nueva tarea",
-            "start_date": datetime.today(),
-            "end_date": datetime.today(),
-            "progress": 0
-        }])
+    if selected:
+        if st.button("➕ Tarea"):
 
-        guardar(pd.concat([df, new]))
-        st.rerun()
+            new = pd.DataFrame([{
+                "nivel": "Tarea",
+                "project_name": selected,
+                "item_name": "Nueva tarea",
+                "start_date": datetime.today(),
+                "end_date": datetime.today(),
+                "progress": 0
+            }])
+
+            guardar(pd.concat([df, new]))
+            st.rerun()
+
+    else:
+        st.warning("Selecciona un proyecto para crear tareas")
 
 
 # ======================
