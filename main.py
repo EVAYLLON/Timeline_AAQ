@@ -39,7 +39,12 @@ def cargar():
 # INSERT LIMPIO ✅
 # ======================
 def insertar_registro(row):
-    supabase.table("projects").insert(row).execute()
+    try:
+        supabase.table("projects").insert(row).execute()
+    except Exception as e:
+        st.error("Error al insertar:")
+        st.write(row)
+        st.write(e)
 
 # ======================
 # TIMELINE
