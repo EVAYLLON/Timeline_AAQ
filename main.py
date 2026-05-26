@@ -44,27 +44,58 @@ def guardar(df):
 
     df = df.copy()
 
-    df = df.replace({pd.NA: None})
-    df = df.where(df.notnull(), None)
+    # ✅ columnas esperadas
+    columnas = [
+        "nivel","project_name","item_name","responsible",
+        "start_date","end_date","progress","estado","document_url"
+    ]
 
-    # evitar duplicados
+    df = df.reindex(columns=columnas)
+
+    # ✅ LIMPIEZA FUERTE (CLAVE)
+    df = df.replace({pd.NA: None})
+
+    # ✅ convertir NaN reales
+    df = df.where(pd.notnull(df), None)
+
+    # ✅ strings obligatorios
+    for col in ["nivel","project_name","item_name","responsible","document_url"]:
+        df[col] = df[col].fillna("").astype(str)
+
+    # ✅ fechas -> string limpio (SIN timestamp)
+    df["start_date"] = pd.to_datetime(df["start_date"], errors="coerce")\
+        .dt.strftime("%Y-%m-%d")
+
+    df["end_date"] = pd.to_datetime(df["end_date"], errors="coerce")\
+        .dt.strftime("%Y-%m-%d")
+
+    # ✅ progress seguro
+    df["progress"] = pd.to_numeric(df["progress"], errors="coerce").fillna(0)
+
+    # ✅ eliminar duplicados
     df = df.drop_duplicates(
         subset=["project_name","item_name","nivel"],
         keep="last"
     )
 
-    # ✅ convertir fechas a string (CRÍTICO)
-    df["start_date"] = pd.to_datetime(df["start_date"], errors="coerce").dt.strftime("%Y-%m-%d")
-    df["end_date"] = pd.to_datetime(df["end_date"], errors="coerce").dt.strftime("%Y-%m-%d")
+    # ✅ evitar filas vacías
+    df = df[df["item_name"] != ""]
 
-    df["progress"] = pd.to_numeric(df["progress"], errors="coerce").fillna(0)
-
+    # ✅ timestamp
     df["updated_at"] = datetime.utcnow().isoformat()
 
-    supabase.table("projects").upsert(
-        df.to_dict("records"),
-        on_conflict="project_name,item_name,nivel"
-    ).execute()
+    # ✅ CONVERSIÓN FINAL SEGURA JSON
+    data = df.to_dict(orient="records")
+
+    try:
+        supabase.table("projects").upsert(
+            data,
+            on_conflict="project_name,item_name,nivel"
+        ).execute()
+
+    except Exception as e:
+        st.error("❌ Error al guardar")
+        st.write(e)
 
 # ======================
 # FUNCIONES
@@ -201,7 +232,13 @@ if selected:
 
         df_rest = df[df["project_name"] != selected]
 
-        df_total = pd.concat([df_rest, edited])
+        df_total = pd.concat([df_rest, edited]).reset_index(drop=True)
+
+        edited = edited.copy()
+
+        edited["start_date"] = pd.to_datetime(edited["start_date"], errors="coerce")
+        edited["end_date"] = pd.to_datetime(edited["end_date"], errors="coerce")
+
 
         guardar(df_total)
 
