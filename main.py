@@ -210,7 +210,8 @@ if selected:
             else:
                 nivel = "Tarea"
 
-            # ✅ convertir fechas SIEMPRE a string válido
+            # ✅ convertir progreso seguro
+               
             try:
                 start_str = pd.to_datetime(row.get("start_date")).strftime("%Y-%m-%d")
             except:
@@ -221,9 +222,9 @@ if selected:
             except:
                 end_str = datetime.today().strftime("%Y-%m-%d")
 
-            # ✅ convertir progreso seguro
+            # ✅ FIX AQUÍ
             try:
-                prog = float(row.get("progress"))
+                prog = int(float(row.get("progress") or 0))
             except:
                 prog = 0
 
