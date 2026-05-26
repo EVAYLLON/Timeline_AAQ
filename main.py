@@ -264,6 +264,19 @@ with col_f2:
     )
 
 if not df.empty:
-    df["timeline_status"] = df.apply(timeline, axis=1)
-    html = build_ms_project_gantt_html(df)
+
+    df["start_date"] = pd.to_datetime(df["start_date"], errors="coerce")
+    df["end_date"] = pd.to_datetime(df["end_date"], errors="coerce")
+
+    # ✅ FILTRO GANTT
+    df_filtrado = df[
+        (df["end_date"] >= pd.to_datetime(fecha_inicio)) &
+        (df["start_date"] <= pd.to_datetime(fecha_fin))
+    ].copy()
+
+    # ✅ timeline status
+    df_filtrado["timeline_status"] = df_filtrado.apply(timeline, axis=1)
+
+    html = build_ms_project_gantt_html(df_filtrado)
+
     components.html(html, height=650)
