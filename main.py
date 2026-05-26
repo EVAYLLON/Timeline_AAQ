@@ -115,7 +115,7 @@ df["start_date"] = df["start_date"].dt.date
 df["end_date"] = df["end_date"].dt.date
 
 # ======================
-# ✅ BOTONES AGREGAR (NUEVO)
+# ✅ BOTONES AGREGAR
 # ======================
 st.subheader("Gestión")
 
@@ -164,6 +164,7 @@ df_display = df.drop(
 )
 
 projects_list = df_display["project_name"].dropna().unique()
+
 edited_blocks = []
 
 for project in projects_list:
@@ -190,13 +191,10 @@ for project in projects_list:
         edited_blocks.append(edited_proj)
 
 # ======================
-# ✅ RECONSTRUCCIÓN GLOBAL (FIX)
+# ✅ RECONSTRUCCIÓN (FIX)
 # ======================
 full_df = pd.concat(edited_blocks, ignore_index=True)
 
-# ======================
-# LIMPIEZA
-# ======================
 full_df["start_date"] = pd.to_datetime(full_df["start_date"], errors="coerce")
 full_df["end_date"] = pd.to_datetime(full_df["end_date"], errors="coerce")
 full_df["progress"] = pd.to_numeric(full_df["progress"], errors="coerce").fillna(0)
@@ -205,7 +203,7 @@ full_df["estado"] = full_df["progress"].apply(calcular_estado)
 full_df["timeline_status"] = full_df.apply(calcular_timeline, axis=1)
 
 # ======================
-# ORDENAMIENTO GANTT
+# ORDENAMIENTO
 # ======================
 orden = {"Proyecto": 0, "Tarea": 1, "Subtarea": 2}
 full_df["nivel_order"] = full_df["nivel"].map(orden)
