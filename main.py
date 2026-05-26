@@ -100,7 +100,6 @@ def calcular_timeline(row):
 # ======================
 df = cargar_datos()
 
-# limpieza
 df["start_date"] = pd.to_datetime(df["start_date"], errors="coerce")
 df["end_date"] = pd.to_datetime(df["end_date"], errors="coerce")
 df["progress"] = pd.to_numeric(df["progress"], errors="coerce").fillna(0)
@@ -115,8 +114,26 @@ df["start_date"] = df["start_date"].dt.date
 df["end_date"] = df["end_date"].dt.date
 
 # ======================
-# UI
+# ✅ VISTA COLAPSABLE (CORRECTA)
 # ======================
+st.subheader("Vista por Proyecto (colapsable)")
+
+projects_list = df["project_name"].dropna().unique()
+
+for project in projects_list:
+    project_df = df[df["project_name"] == project]
+
+    with st.expander(f"📁 {project}", expanded=False):
+        st.dataframe(
+            project_df.sort_values(by=["nivel","start_date"]),
+            use_container_width=True
+        )
+
+# ======================
+# ✅ EDITOR ORIGINAL (NO SE TOCA)
+# ======================
+st.subheader("Editor completo")
+
 df_display = df.drop(
     columns=["id","item_id","parent_id","project_id","nivel_order"],
     errors="ignore"
@@ -153,7 +170,7 @@ full_df["estado"] = full_df["progress"].apply(calcular_estado)
 full_df["timeline_status"] = full_df.apply(calcular_timeline, axis=1)
 
 # ======================
-# 🔥 FIX FINAL GANTT (CLAVE)
+# ORDENAMIENTO GANTT
 # ======================
 orden = {"Proyecto": 0, "Tarea": 1, "Subtarea": 2}
 full_df["nivel_order"] = full_df["nivel"].map(orden)
@@ -192,7 +209,6 @@ if st.button("Exportar HTML"):
 # ======================
 # GANTT
 # ======================
-
 start_date = st.date_input("Inicio", value=full_df["start_date"].min())
 end_date = st.date_input("Fin", value=full_df["end_date"].max())
 
