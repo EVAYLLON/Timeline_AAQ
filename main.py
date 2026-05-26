@@ -8,8 +8,13 @@ from gantt import build_ms_project_gantt_html
 # ======================
 # SUPABASE
 # ======================
-SUPABASE_URL = "https://brrghdszvwvwxwouvqgl.supabase.co"
-SUPABASE_KEY = "sb_publishable_key"
+SUPABASE_URL = "
+SUPABASE_KEY = 
+
+import os
+
+SUPABASE_URL = os.getenv("https://brrghdszvwvwxwouvqgl.supabase.co")
+SUPABASE_KEY = os.getenv("eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJycmdoZHN6dnd2d3h3b3V2cWdsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkyMTc0ODMsImV4cCI6MjA5NDc5MzQ4M30.dnt7f4qTGfbr66JJiKg8TpPmgJ_Et31_OLVz3_CBpdA")
 
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
