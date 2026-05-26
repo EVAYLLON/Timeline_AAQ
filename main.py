@@ -274,9 +274,16 @@ if not df.empty:
         (df["start_date"] <= pd.to_datetime(fecha_fin))
     ].copy()
 
+    st.write("Filtrado:", len(df_filtrado))
     # ✅ timeline status
     df_filtrado["timeline_status"] = df_filtrado.apply(timeline, axis=1)
 
-    html = build_ms_project_gantt_html(df_filtrado)
+
+    html = build_ms_project_gantt_html(
+        df_filtrado,
+        start_date=fecha_inicio,
+        end_date=fecha_fin
+    )
+
 
     components.html(html, height=650)
