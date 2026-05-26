@@ -107,7 +107,7 @@ def build_ms_project_gantt_html(df, start_date=None, end_date=None):
             <div class="task-table">
 
                 <div class="task-name" style="padding-left:{style["indent"]}px;" {click}>
-                    <span class="icon">{style["icon"]}</span>
+                    <span class="icon">{style["icon"]} <span style="color:blue;">{escape(str(row["item_name"]))}</span>
                     {escape(str(row["item_name"]))}
                 </div>
 
