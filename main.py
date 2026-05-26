@@ -18,7 +18,23 @@ supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 # ======================
 def cargar():
     res = supabase.table("projects").select("*").execute()
-    return pd.DataFrame(res.data if res.data else [])
+
+    columnas = [
+        "nivel","project_name","item_name",
+        "responsible","start_date","end_date","progress"
+    ]
+
+    if not res.data:
+        return pd.DataFrame(columns=columnas)
+
+    df = pd.DataFrame(res.data)
+
+    # ✅ asegurar columnas aunque falten
+    for col in columnas:
+        if col not in df.columns:
+            df[col] = None
+
+    return df
 
 # ======================
 # GUARDAR (SEGURO)
@@ -81,7 +97,12 @@ df = cargar()
 # ======================
 # SELECTOR PROYECTO
 # ======================
-proyectos = df[df["nivel"] == "Proyecto"]["project_name"].unique()
+
+if "nivel" in df.columns:
+    proyectos = df[df["nivel"] == "Proyecto"]["project_name"].dropna().unique()
+else:
+    proyectos = []
+
 
 selected = st.selectbox("Proyecto", proyectos) if len(proyectos) > 0 else None
 
@@ -109,6 +130,14 @@ if st.button("✅ Crear proyecto"):
         guardar(pd.concat([df, new], ignore_index=True))
         st.success("Proyecto creado ✅")
         st.rerun()
+
+
+
+if len(proyectos) == 0:
+    st.warning("⚠️ No hay proyectos. Crea uno 👇")
+    selected = None
+else:
+    selected = st.selectbox("Proyecto", proyectos)
 
 # ======================
 # BOTONES
