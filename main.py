@@ -17,6 +17,22 @@ supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 # ======================
 # CARGA DATOS
 # ======================
+
+# ======================
+# CARGA DATOS
+# ======================
+def cargar_datos():
+    response = supabase.table("projects").select("*").execute()
+    data = response.data
+
+    if not data:
+        return pd.DataFrame(columns=[
+            "nivel","project_name","item_name","responsible",
+            "start_date","end_date","progress","estado","document_url"
+        ])
+
+    return pd.DataFrame(data)
+
 def guardar_todo(df):
 
     columnas_validas = [
