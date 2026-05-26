@@ -1,8 +1,7 @@
-from pathlib import Path
+from datetime import datetime
 import pandas as pd
 import streamlit as st
 import streamlit.components.v1 as components
-from datetime import datetime
 from supabase import create_client
 from gantt import build_ms_project_gantt_html
 
@@ -14,21 +13,33 @@ SUPABASE_KEY = "sb_publishable_Kjb0Rhsp_tWeWxdof7-zWA_htBXB3MP"
 
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
-# ======================
-# CARGA DATOS
-# ======================
-def cargar_datos():
-    res = supabase.table("projects").select("*").execute()
-    return pd.DataFrame(res.data if res.data else [])
 
 # ======================
-# GUARDAR (UPSERT)
+# CARGAR DATOS
+# ======================
+def cargar():
+    res = supabase.table("projects").select("*").execute()
+    df = pd.DataFrame(res.data if res.data else [])
+
+    if df.empty:
+        return df
+
+    # ✅ limpiar tareas huérfanas (clave)
+    proyectos = df[df["nivel"] == "Proyecto"]["project_name"]
+
+    df = df[
+        (df["nivel"] == "Proyecto") |
+        (df["project_name"].isin(proyectos))
+    ]
+
+    return df
+
+
+# ======================
+# GUARDAR
 # ======================
 def guardar(df):
 
-    df = df.copy()
-
-    # columnas válidas
     columnas = [
         "nivel","project_name","item_name","responsible",
         "start_date","end_date","progress","estado","document_url"
@@ -39,7 +50,7 @@ def guardar(df):
     df = df.replace({pd.NA: None})
     df = df.where(df.notnull(), None)
 
-    # eliminar duplicados
+    # evitar duplicados
     df = df.drop_duplicates(
         subset=["project_name","item_name","nivel"],
         keep="last"
@@ -47,8 +58,7 @@ def guardar(df):
 
     df["start_date"] = pd.to_datetime(df["start_date"], errors="coerce").dt.date.astype(str)
     df["end_date"] = pd.to_datetime(df["end_date"], errors="coerce").dt.date.astype(str)
-
-    df["progress"] = pd.to_numeric(df["progress"], errors="coerce").fillna(0)
+    df["progress"] = pd.to_numeric(df["progress"]).fillna(0)
 
     df["updated_at"] = datetime.utcnow().isoformat()
 
@@ -57,102 +67,102 @@ def guardar(df):
         on_conflict="project_name,item_name,nivel"
     ).execute()
 
+
 # ======================
 # FUNCIONES
 # ======================
-def calcular_estado(x):
-    x = float(x) if pd.notna(x) else 0
-    if x >= 100:
-        return "Completado"
-    elif x <= 0:
-        return "No iniciado"
+def estado(x):
+    if x >= 100: return "Completado"
+    if x <= 0: return "No iniciado"
     return "En curso"
 
-def calcular_timeline(row):
-    today = pd.Timestamp.today().normalize()
-    progress = float(row.get("progress", 0) or 0)
 
-    if progress >= 100:
+def timeline(row):
+    today = pd.Timestamp.today().normalize()
+
+    if row["progress"] >= 100:
         return "Completado"
 
-    end = pd.to_datetime(row.get("end_date"), errors="coerce")
+    end = pd.to_datetime(row["end_date"], errors="coerce")
 
-    if pd.isna(end):
-        return ""
+    if pd.isna(end): return ""
+    if end < today: return "Vencido"
+    if (end - today).days <= 5: return "En riesgo"
 
-    if end < today:
-        return "Vencido"
-    elif (end - today).days <= 5:
-        return "En riesgo"
     return "En plazo"
 
+
 # ======================
-# CONFIG
+# UI
 # ======================
 st.set_page_config(layout="wide")
-st.title("Project Tracker (Simple y limpio)")
+st.title("Project Tracker (Limpio ✅)")
+
+df = cargar()
 
 # ======================
-# DATA
+# PROYECTOS
 # ======================
-df = cargar_datos()
+proyectos = df[df["nivel"] == "Proyecto"]["project_name"].unique()
 
-if df.empty:
-    st.warning("⚠️ No hay datos. Crea un proyecto")
+if len(proyectos) == 0:
+    st.warning("No hay proyectos")
 
-df["start_date"] = pd.to_datetime(df["start_date"], errors="coerce")
-df["end_date"] = pd.to_datetime(df["end_date"], errors="coerce")
+selected = st.selectbox("Proyecto", proyectos)
 
-df["progress"] = pd.to_numeric(df["progress"], errors="coerce").fillna(0)
 
-df["estado"] = df["progress"].apply(calcular_estado)
-df["timeline_status"] = df.apply(calcular_timeline, axis=1)
-
-df["start_date"] = df["start_date"].dt.date
-df["end_date"] = df["end_date"].dt.date
-
-# ======================
-# SELECTOR PROYECTO
-# ======================
-projects = df[df["nivel"] == "Proyecto"]["project_name"].unique()
-
-selected = st.selectbox("Proyecto", projects)
-
-col1, col2 = st.columns(2)
+col1, col2, col3 = st.columns(3)
 
 # ======================
 # NUEVO PROYECTO
 # ======================
 with col1:
-    if st.button("➕ Nuevo Proyecto"):
+    if st.button("➕ Proyecto"):
+
         new = pd.DataFrame([{
             "nivel": "Proyecto",
-            "project_name": f"Proyecto {len(projects)+1}",
-            "item_name": f"Proyecto {len(projects)+1}",
-            "responsible": "",
+            "project_name": f"Proyecto {len(proyectos)+1}",
+            "item_name": f"Proyecto {len(proyectos)+1}",
             "start_date": datetime.today(),
             "end_date": datetime.today(),
             "progress": 0
         }])
+
         guardar(pd.concat([df, new]))
         st.rerun()
+
 
 # ======================
 # NUEVA TAREA
 # ======================
 with col2:
-    if st.button("➕ Nueva Tarea"):
+    if st.button("➕ Tarea"):
+
         new = pd.DataFrame([{
             "nivel": "Tarea",
             "project_name": selected,
             "item_name": "Nueva tarea",
-            "responsible": "",
             "start_date": datetime.today(),
             "end_date": datetime.today(),
             "progress": 0
         }])
+
         guardar(pd.concat([df, new]))
         st.rerun()
+
+
+# ======================
+# BORRAR PROYECTO
+# ======================
+with col3:
+    if st.button("🗑️ Eliminar Proyecto"):
+
+        # ✅ borrar en DB
+        supabase.table("projects").delete().eq("project_name", selected).execute()
+
+        st.success("Proyecto eliminado ✅")
+        st.rerun()
+
 
 # ======================
 # EDITOR LIMPIO
@@ -163,33 +173,26 @@ df_edit = df[df["project_name"] == selected][[
     "item_name","responsible","start_date","end_date","progress","document_url"
 ]]
 
-edited = st.data_editor(
-    df_edit,
-    use_container_width=True,
-    num_rows="dynamic"
-)
+edit = st.data_editor(df_edit, use_container_width=True)
 
 # ======================
-# GUARDAR
+# GUARDAR EDICIÓN
 # ======================
-if st.button("💾 Guardar Cambios"):
+if st.button("💾 Guardar cambios"):
 
-    df_total = df.copy()
+    df_total = df[df["project_name"] != selected]
 
-    # eliminar viejo bloque
-    df_total = df_total[df_total["project_name"] != selected]
-
-    # reconstruir con valores automáticos
-    edited["nivel"] = edited["item_name"].apply(
+    edit["project_name"] = selected
+    edit["nivel"] = edit["item_name"].apply(
         lambda x: "Proyecto" if x == selected else "Tarea"
     )
-    edited["project_name"] = selected
 
-    df_total = pd.concat([df_total, edited])
+    df_total = pd.concat([df_total, edit])
 
     guardar(df_total)
 
-    st.success("✅ Cambios guardados")
+    st.success("Guardado ✅")
+
 
 # ======================
 # GANTT
@@ -198,14 +201,15 @@ st.subheader("Timeline")
 
 if not df.empty:
 
-    start_series = pd.to_datetime(df["start_date"], errors="coerce").dropna()
-    end_series = pd.to_datetime(df["end_date"], errors="coerce").dropna()
+    df["estado"] = df["progress"].apply(estado)
+    df["timeline_status"] = df.apply(timeline, axis=1)
 
-    start_default = start_series.min().date() if not start_series.empty else datetime.today().date()
-    end_default = end_series.max().date() if not end_series.empty else datetime.today().date()
+    start = pd.to_datetime(df["start_date"], errors="coerce").min()
+    end = pd.to_datetime(df["end_date"], errors="coerce").max()
 
-    start_date = st.date_input("Inicio", value=start_default)
-    end_date = st.date_input("Fin", value=end_default)
+    start_date = st.date_input("Inicio", value=start)
+    end_date = st.date_input("Fin", value=end)
 
     html = build_ms_project_gantt_html(df, start_date, end_date)
+
     components.html(html, height=650, scrolling=False)
