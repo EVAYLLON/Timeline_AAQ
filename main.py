@@ -1,4 +1,3 @@
-
 from pathlib import Path
 import pandas as pd
 import streamlit as st
@@ -15,41 +14,13 @@ SUPABASE_KEY = "sb_publishable_Kjb0Rhsp_tWeWxdof7-zWA_htBXB3MP"
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 # ======================
-# CARGA DATOS
+# SESSION STATE
 # ======================
-def cargar_datos():
+if "data" not in st.session_state:
     response = supabase.table("projects").select("*").execute()
-    data = response.data
+    st.session_state.data = pd.DataFrame(response.data if response.data else [])
 
-    if not data:
-        return pd.DataFrame(columns=[
-            "nivel","project_name","item_name","responsible",
-            "start_date","end_date","progress","estado","document_url"
-        ])
-
-    return pd.DataFrame(data)
-
-# ======================
-# GUARDAR DATOS
-# ======================
-def guardar_todo(df):
-
-    supabase.table("projects").delete().gt("id", 0).execute()
-
-    columnas_validas = [
-        "nivel","project_name","item_name","responsible",
-        "start_date","end_date","progress","estado","document_url"
-    ]
-
-    df_clean = df.reindex(columns=columnas_validas)
-    df_clean = df_clean.where(pd.notnull(df_clean), None)
-
-    df_clean["start_date"] = df_clean["start_date"].astype(str)
-    df_clean["end_date"] = df_clean["end_date"].astype(str)
-    df_clean["progress"] = pd.to_numeric(df_clean["progress"], errors="coerce").fillna(0)
-
-    data = df_clean.to_dict(orient="records")
-    supabase.table("projects").insert(data).execute()
+df = st.session_state.data.copy()
 
 # ======================
 # CONFIG
@@ -64,23 +35,16 @@ st.title("Project Tracker (Jerarquía real)")
 # FUNCIONES
 # ======================
 def calcular_estado(x):
-    try:
-        x = float(x)
-    except:
-        x = 0
-
+    x = float(x) if pd.notna(x) else 0
     if x >= 100:
         return "Completado"
     elif x <= 0:
         return "No iniciado"
-    else:
-        return "En curso"
+    return "En curso"
 
 def calcular_timeline(row):
     today = pd.Timestamp.today().normalize()
-
-    progress = pd.to_numeric(row.get("progress", 0), errors="coerce")
-    progress = 0 if pd.isna(progress) else progress
+    progress = float(row.get("progress", 0) or 0)
 
     if progress >= 100:
         return "Completado"
@@ -94,29 +58,22 @@ def calcular_timeline(row):
         return "Vencido"
     elif (end - today).days <= 5:
         return "En riesgo"
-    else:
-        return "En plazo"
+    return "En plazo"
 
 # ======================
-# DATA
+# LIMPIEZA BASE
 # ======================
-df = cargar_datos()
+if not df.empty:
 
-df["start_date"] = pd.to_datetime(df["start_date"], errors="coerce")
-df["end_date"] = pd.to_datetime(df["end_date"], errors="coerce")
-df["progress"] = pd.to_numeric(df["progress"], errors="coerce").fillna(0)
+    df["start_date"] = pd.to_datetime(df["start_date"], errors="coerce")
+    df["end_date"] = pd.to_datetime(df["end_date"], errors="coerce")
+    df["progress"] = pd.to_numeric(df["progress"], errors="coerce").fillna(0)
 
-for col in ["nivel","project_name","item_name","responsible"]:
-    df[col] = df[col].fillna("").astype(str)
-
-df["estado"] = df["progress"].apply(calcular_estado)
-df["timeline_status"] = df.apply(calcular_timeline, axis=1)
-
-df["start_date"] = df["start_date"].dt.date
-df["end_date"] = df["end_date"].dt.date
+    for col in ["nivel","project_name","item_name","responsible"]:
+        df[col] = df[col].fillna("").astype(str)
 
 # ======================
-# BOTONES AGREGAR
+# BOTONES
 # ======================
 st.subheader("Gestión")
 
@@ -126,8 +83,8 @@ with col1:
     if st.button("➕ Agregar Proyecto"):
         new_row = {
             "nivel": "Proyecto",
-            "project_name": "Nuevo Proyecto",
-            "item_name": "Nuevo Proyecto",
+            "project_name": f"Proyecto {len(df)+1}",
+            "item_name": f"Proyecto {len(df)+1}",
             "responsible": "",
             "start_date": pd.Timestamp.today().date(),
             "end_date": pd.Timestamp.today().date(),
@@ -136,13 +93,14 @@ with col1:
             "document_url": ""
         }
         df = pd.concat([df, pd.DataFrame([new_row])], ignore_index=True)
+        st.session_state.data = df
 
 with col2:
     if st.button("➕ Agregar Tarea"):
-        if not df[df["nivel"] == "Proyecto"].empty:
-            project_name = df[df["nivel"] == "Proyecto"]["project_name"].iloc[0]
-        else:
-            project_name = "Nuevo Proyecto"
+
+        proyecto = df[df["nivel"] == "Proyecto"]["project_name"]
+
+        project_name = proyecto.iloc[0] if not proyecto.empty else "Proyecto 1"
 
         new_row = {
             "nivel": "Tarea",
@@ -155,104 +113,93 @@ with col2:
             "estado": "",
             "document_url": ""
         }
+
         df = pd.concat([df, pd.DataFrame([new_row])], ignore_index=True)
+        st.session_state.data = df
 
 # ======================
-# EDITOR POR PROYECTO
+# EDITOR
 # ======================
 st.subheader("Editor por Proyecto")
 
-df_display = df.drop(
-    columns=["id","item_id","parent_id","project_id","nivel_order"],
-    errors="ignore"
-)
+projects = df["project_name"].unique()
 
-projects_list = df_display["project_name"].dropna().unique()
 edited_blocks = []
 
-for project in projects_list:
+for project in projects:
 
-    proj_df = df_display[df_display["project_name"] == project].copy()
+    proj_df = df[df["project_name"] == project].copy()
 
-    with st.expander(f"📁 {project}", expanded=False):
+    with st.expander(f"📁 {project}", expanded=True):  # ✅ abierto siempre
 
-        edited_proj = st.data_editor(
+        edited = st.data_editor(
             proj_df,
-            num_rows="dynamic",
             use_container_width=True,
-            key=f"editor_{project}",
-            column_config={
-                "nivel": st.column_config.SelectboxColumn("Nivel", options=["Proyecto","Tarea","Subtarea"]),
-                "start_date": st.column_config.DateColumn("Inicio"),
-                "end_date": st.column_config.DateColumn("Fin"),
-                "estado": st.column_config.TextColumn("Estado", disabled=True),
-                "timeline_status": st.column_config.TextColumn("Estado plazo", disabled=True)
-            },
-            disabled=["estado","timeline_status"]
+            num_rows="dynamic",
+            key=f"editor_{project}"
         )
 
-        edited_blocks.append(edited_proj)
+        edited_blocks.append(edited)
 
 # ======================
-# RECONSTRUCCIÓN SEGURA
+# RECONSTRUCCION SEGURA
 # ======================
-if len(edited_blocks) == 0:
-    full_df = pd.DataFrame(columns=df_display.columns)
-else:
+if edited_blocks:
     full_df = pd.concat(edited_blocks, ignore_index=True)
+else:
+    full_df = df.copy()
 
 # ======================
-# LIMPIEZA
+# CALCULOS
 # ======================
-if not full_df.empty:
-    full_df["start_date"] = pd.to_datetime(full_df["start_date"], errors="coerce")
-    full_df["end_date"] = pd.to_datetime(full_df["end_date"], errors="coerce")
-    full_df["progress"] = pd.to_numeric(full_df["progress"], errors="coerce").fillna(0)
+full_df["start_date"] = pd.to_datetime(full_df["start_date"], errors="coerce")
+full_df["end_date"] = pd.to_datetime(full_df["end_date"], errors="coerce")
+full_df["progress"] = pd.to_numeric(full_df["progress"], errors="coerce").fillna(0)
 
-    full_df["estado"] = full_df["progress"].apply(calcular_estado)
-    full_df["timeline_status"] = full_df.apply(calcular_timeline, axis=1)
+full_df["estado"] = full_df["progress"].apply(calcular_estado)
+full_df["timeline_status"] = full_df.apply(calcular_timeline, axis=1)
 
 # ======================
-# ORDENAMIENTO
+# ORDEN
 # ======================
 if not full_df.empty:
 
     orden = {"Proyecto": 0, "Tarea": 1, "Subtarea": 2}
     full_df["nivel_order"] = full_df["nivel"].map(orden)
 
-    proyectos = full_df[full_df["nivel"] == "Proyecto"]
-    tareas = full_df[full_df["nivel"] != "Proyecto"]
+    result = []
 
-    df_ordenado = []
+    for proj in full_df[full_df["nivel"] == "Proyecto"].to_dict("records"):
+        result.append(proj)
 
-    for _, proj in proyectos.iterrows():
-        df_ordenado.append(proj.to_dict())
+        tareas = full_df[
+            (full_df["project_name"] == proj["project_name"]) &
+            (full_df["nivel"] != "Proyecto")
+        ].sort_values(["nivel_order","start_date"])
 
-        tareas_proj = tareas[tareas["project_name"] == proj["project_name"]]
-        tareas_proj = tareas_proj.sort_values(by=["nivel_order","start_date"])
+        result.extend(tareas.to_dict("records"))
 
-        df_ordenado.extend(tareas_proj.to_dict("records"))
-
-    full_df = pd.DataFrame(df_ordenado).reset_index(drop=True)
+    full_df = pd.DataFrame(result)
 
 # ======================
-# BOTONES
+# GUARDAR (SIN BORRAR TODO)
 # ======================
 if st.button("Guardar cambios"):
+
+    # ✅ borra solo si hay datos nuevos
     if not full_df.empty:
-        full_df["start_date"] = full_df["start_date"].astype(str)
-        full_df["end_date"] = full_df["end_date"].astype(str)
 
-        guardar_todo(full_df)
-        st.success("Guardado en Supabase ✅")
-        st.rerun()
-    else:
-        st.warning("No hay datos para guardar")
+        data = full_df.to_dict("records")
 
-if st.button("Exportar HTML"):
-    html = build_ms_project_gantt_html(full_df)
-    export_gantt_html(html, REPORT_PATH)
-    st.success("Exportado ✅")
+        for r in data:
+            r["start_date"] = str(r["start_date"])
+            r["end_date"] = str(r["end_date"])
+
+        # ✅ reemplazo seguro
+        supabase.table("projects").delete().neq("project_name", "").execute()
+        supabase.table("projects").insert(data).execute()
+
+        st.success("Guardado correctamente ✅")
 
 # ======================
 # GANTT
@@ -260,10 +207,12 @@ if st.button("Exportar HTML"):
 st.subheader("Timeline")
 
 if full_df.empty:
-    st.warning("⚠️ No hay datos. Agrega un proyecto para comenzar.")
+    st.warning("⚠️ No hay datos. Agrega un proyecto.")
 else:
+
     start_date = st.date_input("Inicio", value=full_df["start_date"].min())
     end_date = st.date_input("Fin", value=full_df["end_date"].max())
 
     html = build_ms_project_gantt_html(full_df, start_date, end_date)
+
     components.html(html, height=650, scrolling=False)
