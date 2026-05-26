@@ -205,14 +205,31 @@ if selected:
             else:
                 nivel = "Tarea"
 
+            # ✅ convertir fechas SIEMPRE a string válido
+            try:
+                start_str = pd.to_datetime(row.get("start_date")).strftime("%Y-%m-%d")
+            except:
+                start_str = datetime.today().strftime("%Y-%m-%d")
+
+            try:
+                end_str = pd.to_datetime(row.get("end_date")).strftime("%Y-%m-%d")
+            except:
+                end_str = datetime.today().strftime("%Y-%m-%d")
+
+            # ✅ convertir progreso seguro
+            try:
+                prog = float(row.get("progress"))
+            except:
+                prog = 0
+
             registro = {
                 "nivel": nivel,
                 "project_name": selected,
                 "item_name": item,
                 "responsible": str(row.get("responsible") or ""),
-                "start_date": start.strftime("%Y-%m-%d") if pd.notna(start) else datetime.today().strftime("%Y-%m-%d"),
-                "end_date": end.strftime("%Y-%m-%d") if pd.notna(end) else datetime.today().strftime("%Y-%m-%d"),
-                "progress": float(row.get("progress") or 0)
+                "start_date": start_str,
+                "end_date": end_str,
+                "progress": prog
             }
 
             insertar_registro(registro)
