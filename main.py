@@ -115,82 +115,70 @@ df["start_date"] = df["start_date"].dt.date
 df["end_date"] = df["end_date"].dt.date
 
 # ======================
-# ✅ EDITOR COLAPSABLE + CONTROL DE CREACIÓN
+# ✅ BOTONES AGREGAR (NUEVO)
 # ======================
 st.subheader("Gestión")
 
 col1, col2 = st.columns(2)
 
-# ✅ AGREGAR PROYECTO (CORREGIDO)
 with col1:
     if st.button("➕ Agregar Proyecto"):
-        new_proj = pd.DataFrame([{
+        new_row = {
             "nivel": "Proyecto",
-            "project_name": f"Nuevo Proyecto {len(df)+1}",
-            "item_name": f"Nuevo Proyecto {len(df)+1}",
+            "project_name": "Nuevo Proyecto",
+            "item_name": "Nuevo Proyecto",
             "responsible": "",
-            "start_date": pd.Timestamp.today(),
-            "end_date": pd.Timestamp.today(),
+            "start_date": pd.Timestamp.today().date(),
+            "end_date": pd.Timestamp.today().date(),
             "progress": 0,
-            "estado": "No iniciado",
-            "timeline_status": ""
-        }])
+            "estado": "",
+            "document_url": ""
+        }
+        df = pd.concat([df, pd.DataFrame([new_row])], ignore_index=True)
 
-        df = pd.concat([df, new_proj], ignore_index=True)
-        st.session_state["df_editor"] = df
-        st.rerun()
+with col2:
+    if st.button("➕ Agregar Tarea"):
+        project_name = df[df["nivel"] == "Proyecto"]["project_name"].iloc[0] if not df.empty else "Nuevo Proyecto"
 
-# ✅ BASE DE DATOS EN MEMORIA
-if "df_editor" not in st.session_state:
-    st.session_state["df_editor"] = df.copy()
-
-df_work = st.session_state["df_editor"]
+        new_row = {
+            "nivel": "Tarea",
+            "project_name": project_name,
+            "item_name": "Nueva Tarea",
+            "responsible": "",
+            "start_date": pd.Timestamp.today().date(),
+            "end_date": pd.Timestamp.today().date(),
+            "progress": 0,
+            "estado": "",
+            "document_url": ""
+        }
+        df = pd.concat([df, pd.DataFrame([new_row])], ignore_index=True)
 
 # ======================
 # ✅ EDITOR POR PROYECTO
 # ======================
 st.subheader("Editor por Proyecto")
 
-projects_list = df_work["project_name"].dropna().unique()
+df_display = df.drop(
+    columns=["id","item_id","parent_id","project_id","nivel_order"],
+    errors="ignore"
+)
 
+projects_list = df_display["project_name"].dropna().unique()
 edited_blocks = []
 
 for project in projects_list:
 
-    proj_df = df_work[df_work["project_name"] == project].copy()
+    proj_df = df_display[df_display["project_name"] == project].copy()
 
     with st.expander(f"📁 {project}", expanded=False):
-
-        # ✅ BOTÓN AGREGAR TAREA DENTRO DEL PROYECTO
-        if st.button(f"➕ Agregar tarea en {project}", key=f"add_task_{project}"):
-
-            new_task = pd.DataFrame([{
-                "nivel": "Tarea",
-                "project_name": project,
-                "item_name": "Nueva tarea",
-                "responsible": "",
-                "start_date": pd.Timestamp.today(),
-                "end_date": pd.Timestamp.today(),
-                "progress": 0,
-                "estado": "No iniciado",
-                "timeline_status": ""
-            }])
-
-            df_work = pd.concat([df_work, new_task], ignore_index=True)
-            st.session_state["df_editor"] = df_work
-            st.rerun()
 
         edited_proj = st.data_editor(
             proj_df,
             num_rows="dynamic",
             use_container_width=True,
             key=f"editor_{project}",
-
             column_config={
-                "nivel": st.column_config.SelectboxColumn(
-                    "Nivel",
-                    options=["Proyecto","Tarea","Subtarea"]
-                ),
+                "nivel": st.column_config.SelectboxColumn("Nivel", options=["Proyecto","Tarea","Subtarea"]),
                 "start_date": st.column_config.DateColumn("Inicio"),
                 "end_date": st.column_config.DateColumn("Fin"),
                 "estado": st.column_config.TextColumn("Estado", disabled=True),
@@ -202,10 +190,9 @@ for project in projects_list:
         edited_blocks.append(edited_proj)
 
 # ======================
-# ✅ RECONSTRUCCIÓN FINAL
+# ✅ RECONSTRUCCIÓN GLOBAL (FIX)
 # ======================
 full_df = pd.concat(edited_blocks, ignore_index=True)
-
 
 # ======================
 # LIMPIEZA
