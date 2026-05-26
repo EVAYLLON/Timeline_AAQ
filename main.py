@@ -50,7 +50,6 @@ def calcular_timeline(row):
         return "Completado"
 
     end = pd.to_datetime(row.get("end_date"), errors="coerce")
-
     if pd.isna(end):
         return ""
 
@@ -64,7 +63,6 @@ def calcular_timeline(row):
 # LIMPIEZA BASE
 # ======================
 if not df.empty:
-
     df["start_date"] = pd.to_datetime(df["start_date"], errors="coerce")
     df["end_date"] = pd.to_datetime(df["end_date"], errors="coerce")
     df["progress"] = pd.to_numeric(df["progress"], errors="coerce").fillna(0)
@@ -94,13 +92,14 @@ with col1:
         }
         df = pd.concat([df, pd.DataFrame([new_row])], ignore_index=True)
         st.session_state.data = df
+        st.rerun()
 
 with col2:
     if st.button("➕ Agregar Tarea"):
 
-        proyecto = df[df["nivel"] == "Proyecto"]["project_name"]
+        proyectos = df[df["nivel"] == "Proyecto"]
 
-        project_name = proyecto.iloc[0] if not proyecto.empty else "Proyecto 1"
+        project_name = proyectos["project_name"].iloc[0] if not proyectos.empty else "Proyecto 1"
 
         new_row = {
             "nivel": "Tarea",
@@ -116,6 +115,7 @@ with col2:
 
         df = pd.concat([df, pd.DataFrame([new_row])], ignore_index=True)
         st.session_state.data = df
+        st.rerun()
 
 # ======================
 # EDITOR
@@ -123,14 +123,17 @@ with col2:
 st.subheader("Editor por Proyecto")
 
 projects = df["project_name"].unique()
-
 edited_blocks = []
 
 for project in projects:
 
     proj_df = df[df["project_name"] == project].copy()
 
-    with st.expander(f"📁 {project}", expanded=True):  # ✅ abierto siempre
+    expanded_state = st.session_state.get(f"exp_{project}", True)
+
+    with st.expander(f"📁 {project}", expanded=expanded_state):
+
+        st.session_state[f"exp_{project}"] = True
 
         edited = st.data_editor(
             proj_df,
@@ -160,46 +163,39 @@ full_df["estado"] = full_df["progress"].apply(calcular_estado)
 full_df["timeline_status"] = full_df.apply(calcular_timeline, axis=1)
 
 # ======================
-# ORDEN
-# ======================
-if not full_df.empty:
-
-    orden = {"Proyecto": 0, "Tarea": 1, "Subtarea": 2}
-    full_df["nivel_order"] = full_df["nivel"].map(orden)
-
-    result = []
-
-    for proj in full_df[full_df["nivel"] == "Proyecto"].to_dict("records"):
-        result.append(proj)
-
-        tareas = full_df[
-            (full_df["project_name"] == proj["project_name"]) &
-            (full_df["nivel"] != "Proyecto")
-        ].sort_values(["nivel_order","start_date"])
-
-        result.extend(tareas.to_dict("records"))
-
-    full_df = pd.DataFrame(result)
-
-# ======================
-# GUARDAR (SIN BORRAR TODO)
+# GUARDADO SEGURO (FIX)
 # ======================
 if st.button("Guardar cambios"):
 
-    # ✅ borra solo si hay datos nuevos
     if not full_df.empty:
 
-        data = full_df.to_dict("records")
+        df_save = full_df.copy()
 
-        for r in data:
-            r["start_date"] = str(r["start_date"])
-            r["end_date"] = str(r["end_date"])
+        columnas_validas = [
+            "nivel","project_name","item_name","responsible",
+            "start_date","end_date","progress","estado","document_url"
+        ]
 
-        # ✅ reemplazo seguro
-        supabase.table("projects").delete().neq("project_name", "").execute()
-        supabase.table("projects").insert(data).execute()
+        df_save = df_save.reindex(columns=columnas_validas)
 
-        st.success("Guardado correctamente ✅")
+        # limpiar nulls
+        df_save = df_save.where(pd.notnull(df_save), None)
+
+        # tipos correctos
+        df_save["progress"] = pd.to_numeric(df_save["progress"], errors="coerce").fillna(0)
+        df_save["start_date"] = df_save["start_date"].astype(str)
+        df_save["end_date"] = df_save["end_date"].astype(str)
+
+        data = df_save.to_dict(orient="records")
+
+        try:
+            # ✅ insert sin borrar tabla
+            supabase.table("projects").insert(data).execute()
+            st.success("✅ Guardado correctamente")
+
+        except Exception as e:
+            st.error("❌ Error al guardar en Supabase")
+            st.write(e)
 
 # ======================
 # GANTT
@@ -209,10 +205,8 @@ st.subheader("Timeline")
 if full_df.empty:
     st.warning("⚠️ No hay datos. Agrega un proyecto.")
 else:
-
     start_date = st.date_input("Inicio", value=full_df["start_date"].min())
     end_date = st.date_input("Fin", value=full_df["end_date"].max())
 
     html = build_ms_project_gantt_html(full_df, start_date, end_date)
-
     components.html(html, height=650, scrolling=False)
