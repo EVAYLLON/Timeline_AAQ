@@ -189,31 +189,28 @@ if selected:
             .execute()
 
         # ✅ insertar limpio con validación
-        for _, row in edited.iterrows():
+        for i, row in edited.iterrows():
 
-            # ⛔ evitar filas vacías
-            if not row.get("item_name"):
+            item = str(row.get("item_name", "")).strip()
+
+            # ✅ NO ignorar el proyecto principal
+            if item == "":
                 continue
 
-            try:
-                # ✅ convertir fechas correctamente
-                start = pd.to_datetime(row.get("start_date"), errors="coerce")
-                end = pd.to_datetime(row.get("end_date"), errors="coerce")
+            start = pd.to_datetime(row.get("start_date"), errors="coerce")
+            end = pd.to_datetime(row.get("end_date"), errors="coerce")
 
-                registro = {
-                    "nivel": "Proyecto" if row["item_name"] == selected else "Tarea",
-                    "project_name": selected,
-                    "item_name": str(row.get("item_name")),
-                    "responsible": str(row.get("responsible", "")),
-                    "start_date": start.strftime("%Y-%m-%d") if pd.notna(start) else datetime.today().strftime("%Y-%m-%d"),
-                    "end_date": end.strftime("%Y-%m-%d") if pd.notna(end) else datetime.today().strftime("%Y-%m-%d"),
-                    "progress": float(row.get("progress", 0) or 0)
-                }
+            registro = {
+                "nivel": "Proyecto" if i == 0 else "Tarea",   # 🔥 clave
+                "project_name": selected,
+                "item_name": item,
+                "responsible": str(row.get("responsible") or ""),
+                "start_date": start.strftime("%Y-%m-%d") if pd.notna(start) else datetime.today().strftime("%Y-%m-%d"),
+                "end_date": end.strftime("%Y-%m-%d") if pd.notna(end) else datetime.today().strftime("%Y-%m-%d"),
+                "progress": float(row.get("progress") or 0)
+            }
 
-                insertar_registro(registro)
-
-            except Exception as e:
-                st.warning(f"Fila ignorada por error: {row}")
+            insertar_registro(registro)
 
 # ======================
 # GANTT
