@@ -152,13 +152,14 @@ with col2:
 if selected:
 
     st.subheader("Editor")
-
     df_edit = df[df["project_name"] == selected][[
         "nivel","item_name","responsible",
         "start_date","end_date","progress"
     ]].copy()
 
-    # ✅ LIMPIEZA CRÍTICA (SOLUCIONA ERROR STREAMLIT)
+    # ✅ LIMPIEZA CRÍTICA
+    df_edit = df_edit.dropna(subset=["item_name"])
+
     df_edit["nivel"] = df_edit["nivel"].fillna("Tarea").astype(str)
     df_edit["item_name"] = df_edit["item_name"].fillna("").astype(str)
     df_edit["responsible"] = df_edit["responsible"].fillna("").astype(str)
@@ -181,37 +182,38 @@ if selected:
 
     if st.button("💾 Guardar cambios"):
 
-        # eliminar proyecto actual
+        # ✅ borrar proyecto actual
         supabase.table("projects")\
             .delete()\
             .eq("project_name", selected)\
             .execute()
 
-        # insertar limpio
+        # ✅ insertar limpio con validación
         for _, row in edited.iterrows():
 
-            registro = {
-                "nivel": "Proyecto" if row["item_name"] == selected else "Tarea",
-                "project_name": selected,
-                "item_name": str(row["item_name"]),
-                "responsible": str(row["responsible"]),
-                "start_date": (
-                    pd.to_datetime(row["start_date"]).strftime("%Y-%m-%d")
-                    if pd.notna(row["start_date"])
-                    else datetime.today().strftime("%Y-%m-%d")
-                ),
-                "end_date": (
-                    pd.to_datetime(row["end_date"]).strftime("%Y-%m-%d")
-                    if pd.notna(row["end_date"])
-                    else datetime.today().strftime("%Y-%m-%d")
-                ),
-                "progress": float(row["progress"])
-            }
+            # ⛔ evitar filas vacías
+            if not row.get("item_name"):
+                continue
 
-            insertar_registro(registro)
+            try:
+                # ✅ convertir fechas correctamente
+                start = pd.to_datetime(row.get("start_date"), errors="coerce")
+                end = pd.to_datetime(row.get("end_date"), errors="coerce")
 
-        st.success("Guardado ✅")
-        st.rerun()
+                registro = {
+                    "nivel": "Proyecto" if row["item_name"] == selected else "Tarea",
+                    "project_name": selected,
+                    "item_name": str(row.get("item_name")),
+                    "responsible": str(row.get("responsible", "")),
+                    "start_date": start.strftime("%Y-%m-%d") if pd.notna(start) else datetime.today().strftime("%Y-%m-%d"),
+                    "end_date": end.strftime("%Y-%m-%d") if pd.notna(end) else datetime.today().strftime("%Y-%m-%d"),
+                    "progress": float(row.get("progress", 0) or 0)
+                }
+
+                insertar_registro(registro)
+
+            except Exception as e:
+                st.warning(f"Fila ignorada por error: {row}")
 
 # ======================
 # GANTT
