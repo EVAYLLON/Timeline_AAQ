@@ -236,6 +236,15 @@ if not df.empty:
         (df["project_name"].isin(proyectos_validos))
     ]
 
+    # 🔥 FILTRO FINAL ANTIBASURA
+    proyectos_validos = df[df["nivel"] == "Proyecto"]["project_name"].dropna().unique()
+
+    df = df[
+        (df["nivel"] == "Proyecto") |
+        (df["project_name"].isin(proyectos_validos))
+    ]
+
     html = build_ms_project_gantt_html(df)
+
 
     components.html(html, height=650, scrolling=False)
