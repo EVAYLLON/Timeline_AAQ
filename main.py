@@ -17,22 +17,6 @@ supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 # ======================
 # CARGA DATOS
 # ======================
-def cargar_datos():
-    response = supabase.table("projects").select("*").execute()
-    data = response.data
-
-    if not data:
-        return pd.DataFrame(columns=[
-            "nivel","project_name","item_name","responsible",
-            "start_date","end_date","progress","estado","document_url"
-        ])
-
-    return pd.DataFrame(data)
-
-
-# ======================
-# UPSERT PRO
-# ======================
 def guardar_todo(df):
 
     columnas_validas = [
@@ -42,11 +26,17 @@ def guardar_todo(df):
 
     df_clean = df.reindex(columns=columnas_validas)
 
-    # 🔥 CLAVE → eliminar NaN REAL
+    # ✅ eliminar NaN
     df_clean = df_clean.replace({pd.NA: None})
     df_clean = df_clean.where(df_clean.notnull(), None)
 
-    # ✅ fechas solo día
+    # ✅ eliminar duplicados (CRÍTICO)
+    df_clean = df_clean.drop_duplicates(
+        subset=["project_name", "item_name", "nivel"],
+        keep="last"
+    )
+
+    # ✅ fechas
     df_clean["start_date"] = pd.to_datetime(df_clean["start_date"], errors="coerce").dt.date
     df_clean["end_date"] = pd.to_datetime(df_clean["end_date"], errors="coerce").dt.date
 
@@ -55,7 +45,6 @@ def guardar_todo(df):
 
     df_clean["progress"] = pd.to_numeric(df_clean["progress"], errors="coerce").fillna(0)
 
-    # ✅ updated_at
     df_clean["updated_at"] = datetime.utcnow().isoformat()
 
     data = df_clean.to_dict(orient="records")
@@ -66,7 +55,7 @@ def guardar_todo(df):
             on_conflict="project_name,item_name,nivel"
         ).execute()
 
-        st.success("✅ Guardado correctamente (UPsert)")
+        st.success("✅ Guardado corretamente (sin duplicados)")
 
     except Exception as e:
         st.error("❌ Error Supabase")
