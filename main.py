@@ -175,6 +175,51 @@ with col2:
 
         guardar(pd.concat([df, new], ignore_index=True))
         st.rerun()
+col1, col2, col3 = st.columns(3)
+
+# ➕ PROYECTO
+with col1:
+    if st.button("➕ Proyecto"):
+        nombre = f"Proyecto {len(proyectos)+1}"
+
+        new = pd.DataFrame([{
+            "nivel": "Proyecto",
+            "project_name": nombre,
+            "item_name": nombre,
+            "start_date": datetime.today(),
+            "end_date": datetime.today(),
+            "progress": 0
+        }])
+
+        guardar(pd.concat([df, new], ignore_index=True))
+        st.rerun()
+
+# ➕ TAREA
+with col2:
+    if selected and st.button("➕ Tarea"):
+        new = pd.DataFrame([{
+            "nivel": "Tarea",
+            "project_name": selected,
+            "item_name": "Nueva tarea",
+            "start_date": datetime.today(),
+            "end_date": datetime.today(),
+            "progress": 0
+        }])
+
+        guardar(pd.concat([df, new], ignore_index=True))
+        st.rerun()
+
+# 🗑 BORRAR PROYECTO
+with col3:
+    if selected and st.button("🗑️ Eliminar Proyecto"):
+
+        supabase.table("projects")\
+            .delete()\
+            .eq("project_name", selected)\
+            .execute()
+
+        st.success(f"{selected} eliminado ✅")
+        st.rerun()
 
 # ======================
 # EDITOR
@@ -196,10 +241,15 @@ if selected:
         num_rows="dynamic",
         use_container_width=True,
         column_config={
+            "nivel": st.column_config.TextColumn(
+                "Nivel",
+                disabled=True  # 🔒 BLOQUEADO
+            ),
             "start_date": st.column_config.DateColumn("Inicio"),
             "end_date": st.column_config.DateColumn("Fin"),
         }
     )
+
 
     if st.button("💾 Guardar cambios"):
 
