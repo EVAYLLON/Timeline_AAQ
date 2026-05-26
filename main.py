@@ -44,7 +44,6 @@ def guardar(df):
 
     df = df.copy()
 
-    # ✅ columnas esperadas
     columnas = [
         "nivel","project_name","item_name","responsible",
         "start_date","end_date","progress","estado","document_url"
@@ -52,50 +51,119 @@ def guardar(df):
 
     df = df.reindex(columns=columnas)
 
-    # ✅ LIMPIEZA FUERTE (CLAVE)
     df = df.replace({pd.NA: None})
-
-    # ✅ convertir NaN reales
     df = df.where(pd.notnull(df), None)
 
-    # ✅ strings obligatorios
-    for col in ["nivel","project_name","item_name","responsible","document_url"]:
+    # ✅ limpiar strings
+    for col in ["project_name","item_name","responsible","document_url"]:
         df[col] = df[col].fillna("").astype(str)
 
-    # ✅ fechas -> string limpio (SIN timestamp)
+    # ✅ quitar filas vacías o inválidas
+    df = df[df["item_name"] != ""]
+    df = df[df["project_name"] != ""]
+
+    # ✅ quitar tareas huérfanas
+    proyectos_validos = df[df["nivel"] == "Proyecto"]["project_name"]
+
+    df = df[
+        (df["nivel"] == "Proyecto") |
+        (df["project_name"].isin(proyectos_validos))
+    ]
+
+    # ✅ fechas
     df["start_date"] = pd.to_datetime(df["start_date"], errors="coerce")\
         .dt.strftime("%Y-%m-%d")
 
     df["end_date"] = pd.to_datetime(df["end_date"], errors="coerce")\
         .dt.strftime("%Y-%m-%d")
 
-    # ✅ progress seguro
+    # ✅ progreso
     df["progress"] = pd.to_numeric(df["progress"], errors="coerce").fillna(0)
 
-    # ✅ eliminar duplicados
+    df["updated_at"] = datetime.utcnow().isoformat()
+
+    # ✅ evitar duplicados
     df = df.drop_duplicates(
         subset=["project_name","item_name","nivel"],
         keep="last"
     )
 
-    # ✅ evitar filas vacías
-    df = df[df["item_name"] != ""]
+    supabase.table("projects").upsert(
+        df.to_dict("records"),
+        on_conflict="project_name,item_name,nivel"
+    ).execute()
 
-    # ✅ timestamp
-    df["updated_at"] = datetime.utcnow().isoformat()
 
-    # ✅ CONVERSIÓN FINAL SEGURA JSON
-    data = df.to_dict(orient="records")
+# ======================
+# EDITOR
+# ======================
+st.subheader("Editor")
 
-    try:
-        supabase.table("projects").upsert(
-            data,
-            on_conflict="project_name,item_name,nivel"
-        ).execute()
+if selected:
 
-    except Exception as e:
-        st.error("❌ Error al guardar")
-        st.write(e)
+    df_edit = df[df["project_name"] == selected][[
+        "nivel","item_name","responsible","start_date","end_date","progress","document_url"
+    ]].copy()
+
+    df_edit["start_date"] = pd.to_datetime(df_edit["start_date"], errors="coerce")
+    df_edit["end_date"] = pd.to_datetime(df_edit["end_date"], errors="coerce")
+
+    edited = st.data_editor(
+        df_edit,
+        use_container_width=True,
+        num_rows="dynamic",
+        column_config={
+            "nivel": st.column_config.SelectboxColumn(
+                "Nivel", options=["Proyecto","Tarea","Subtarea"]
+            ),
+            "start_date": st.column_config.DateColumn("Inicio"),
+            "end_date": st.column_config.DateColumn("Fin"),
+        }
+    )
+
+    # ✅ BOTÓN ELIMINAR FILAS
+    col_del1, col_del2 = st.columns([1,3])
+
+    with col_del1:
+        if st.button("🗑 Eliminar filtrar"):
+            edited = edited[~edited["item_name"].isin([""])]  # limpieza simple
+
+    # ======================
+    # GUARDAR
+    # ======================
+    if st.button("💾 Guardar cambios"):
+
+        edited = edited.copy()
+
+        edited["start_date"] = pd.to_datetime(edited["start_date"], errors="coerce")
+        edited["end_date"] = pd.to_datetime(edited["end_date"], errors="coerce")
+
+        # ✅ proyecto renombrado
+        if (edited["nivel"] == "Proyecto").any():
+            nuevo_nombre = edited.loc[
+                edited["nivel"] == "Proyecto", "item_name"
+            ].iloc[0]
+        else:
+            nuevo_nombre = selected
+
+        edited["project_name"] = nuevo_nombre
+
+        # ✅ eliminar duplicados internos
+        edited = edited.drop_duplicates()
+
+        # ✅ eliminar filas borradas
+        df_rest = df[df["project_name"] != selected]
+
+        df_total = pd.concat([df_rest, edited]).reset_index(drop=True)
+
+        # ✅ limpieza final (CRÍTICA)
+        df_total = df_total[df_total["item_name"] != ""]
+        df_total = df_total[df_total["project_name"] != ""]
+
+        guardar(df_total)
+
+        st.success("✅ Guardado correctamente")
+        st.rerun()
 
 # ======================
 # FUNCIONES
