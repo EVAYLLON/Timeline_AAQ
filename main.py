@@ -132,29 +132,51 @@ for project in projects_list:
 # ======================
 # ✅ EDITOR ORIGINAL (NO SE TOCA)
 # ======================
-st.subheader("Editor completo")
+# ======================
+# ✅ EDITOR COLAPSABLE POR PROYECTO
+# ======================
+st.subheader("Editor por Proyecto")
 
 df_display = df.drop(
     columns=["id","item_id","parent_id","project_id","nivel_order"],
     errors="ignore"
 )
 
-edited_df = st.data_editor(
-    df_display,
-    num_rows="dynamic",
-    use_container_width=True,
-    column_config={
-        "nivel": st.column_config.SelectboxColumn(
-            "Nivel",
-            options=["Proyecto","Tarea","Subtarea"]
-        ),
-        "start_date": st.column_config.DateColumn("Inicio"),
-        "end_date": st.column_config.DateColumn("Fin"),
-        "estado": st.column_config.TextColumn("Estado", disabled=True),
-        "timeline_status": st.column_config.TextColumn("Estado plazo", disabled=True)
-    },
-    disabled=["estado","timeline_status"]
-)
+projects_list = df_display["project_name"].dropna().unique()
+
+edited_blocks = []
+
+for project in projects_list:
+
+    proj_df = df_display[df_display["project_name"] == project].copy()
+
+    with st.expander(f"📁 {project}", expanded=False):
+
+        edited_proj = st.data_editor(
+            proj_df,
+            num_rows="dynamic",
+            use_container_width=True,
+            key=f"editor_{project}",
+
+            column_config={
+                "nivel": st.column_config.SelectboxColumn(
+                    "Nivel",
+                    options=["Proyecto","Tarea","Subtarea"]
+                ),
+                "start_date": st.column_config.DateColumn("Inicio"),
+                "end_date": st.column_config.DateColumn("Fin"),
+                "estado": st.column_config.TextColumn("Estado", disabled=True),
+                "timeline_status": st.column_config.TextColumn("Estado plazo", disabled=True)
+            },
+            disabled=["estado","timeline_status"]
+        )
+
+        edited_blocks.append(edited_proj)
+
+# ======================
+# ✅ RECONSTRUCCION GLOBAL (CLAVE)
+# ======================
+full_df = pd.concat(edited_blocks, ignore_index=True)
 
 # ======================
 # RECONSTRUCCION
