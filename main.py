@@ -17,10 +17,6 @@ supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 # ======================
 # CARGA DATOS
 # ======================
-
-# ======================
-# CARGA DATOS
-# ======================
 def cargar_datos():
     response = supabase.table("projects").select("*").execute()
     data = response.data
@@ -33,6 +29,10 @@ def cargar_datos():
 
     return pd.DataFrame(data)
 
+
+# ======================
+# GUARDAR (UPSERT PRO)
+# ======================
 def guardar_todo(df):
 
     columnas_validas = [
@@ -42,17 +42,15 @@ def guardar_todo(df):
 
     df_clean = df.reindex(columns=columnas_validas)
 
-    # ✅ eliminar NaN
     df_clean = df_clean.replace({pd.NA: None})
     df_clean = df_clean.where(df_clean.notnull(), None)
 
-    # ✅ eliminar duplicados (CRÍTICO)
+    # ✅ eliminar duplicados antes de upsert
     df_clean = df_clean.drop_duplicates(
-        subset=["project_name", "item_name", "nivel"],
+        subset=["project_name","item_name","nivel"],
         keep="last"
     )
 
-    # ✅ fechas
     df_clean["start_date"] = pd.to_datetime(df_clean["start_date"], errors="coerce").dt.date
     df_clean["end_date"] = pd.to_datetime(df_clean["end_date"], errors="coerce").dt.date
 
@@ -65,27 +63,13 @@ def guardar_todo(df):
 
     data = df_clean.to_dict(orient="records")
 
-    try:
-        supabase.table("projects").upsert(
-            data,
-            on_conflict="project_name,item_name,nivel"
-        ).execute()
+    supabase.table("projects").upsert(
+        data,
+        on_conflict="project_name,item_name,nivel"
+    ).execute()
 
-        st.success("✅ Guardado corretamente (sin duplicados)")
+    st.success("✅ Guardado correctamente")
 
-    except Exception as e:
-        st.error("❌ Error Supabase")
-        st.write(e)
-
-
-# ======================
-# CONFIG
-# ======================
-BASE_DIR = Path(__file__).resolve().parent
-REPORT_PATH = BASE_DIR / "reports" / "gantt.html"
-
-st.set_page_config(layout="wide")
-st.title("Project Tracker (Jerarquía real)")
 
 # ======================
 # FUNCIONES
@@ -98,9 +82,7 @@ def calcular_estado(x):
         return "No iniciado"
     return "En curso"
 
-
 def calcular_timeline(row):
-
     today = pd.Timestamp.today().normalize()
 
     progress = pd.to_numeric(row.get("progress", 0), errors="coerce")
@@ -122,10 +104,20 @@ def calcular_timeline(row):
 
 
 # ======================
+# CONFIG
+# ======================
+BASE_DIR = Path(__file__).resolve().parent
+REPORT_PATH = BASE_DIR / "reports" / "gantt.html"
+
+st.set_page_config(layout="wide")
+st.title("Project Tracker (Jerarquía real)")
+
+# ======================
 # DATA
 # ======================
 df = cargar_datos()
 
+# limpieza
 df["start_date"] = pd.to_datetime(df["start_date"], errors="coerce")
 df["end_date"] = pd.to_datetime(df["end_date"], errors="coerce")
 df["progress"] = pd.to_numeric(df["progress"], errors="coerce").fillna(0)
@@ -140,63 +132,104 @@ df["start_date"] = df["start_date"].dt.date
 df["end_date"] = df["end_date"].dt.date
 
 # ======================
-# EDITOR
+# SELECTOR PROYECTO
 # ======================
-st.subheader("Editor por Proyecto")
+st.subheader("Gestión")
 
-projects = df["project_name"].unique()
-edited_blocks = []
+projects = df[df["nivel"] == "Proyecto"]["project_name"].unique()
 
-for project in projects:
+selected_project = st.selectbox(
+    "Selecciona Proyecto",
+    projects if len(projects) > 0 else ["(sin proyectos)"]
+)
 
-    proj_df = df[df["project_name"] == project]
-
-    with st.expander(f"📁 {project}", expanded=True):
-
-        edited = st.data_editor(
-            proj_df,
-            num_rows="dynamic",
-            use_container_width=True,
-            key=f"editor_{project}"
-        )
-
-        edited_blocks.append(edited)
-
-# ======================
-# RECONSTRUCCIÓN
-# ======================
-if edited_blocks:
-    full_df = pd.concat(edited_blocks, ignore_index=True)
-else:
-    full_df = df.copy()
-
-# ======================
-# BOTONES
-# ======================
 col1, col2 = st.columns(2)
 
+# ======================
+# AGREGAR PROYECTO
+# ======================
 with col1:
-    if st.button("Guardar cambios"):
-        guardar_todo(full_df)
+    if st.button("➕ Nuevo Proyecto"):
 
+        new_proj = pd.DataFrame([{
+            "nivel": "Proyecto",
+            "project_name": f"Proyecto {len(projects)+1}",
+            "item_name": f"Proyecto {len(projects)+1}",
+            "responsible": "",
+            "start_date": datetime.today().date(),
+            "end_date": datetime.today().date(),
+            "progress": 0
+        }])
+
+        df = pd.concat([df, new_proj], ignore_index=True)
+        guardar_todo(df)
+        st.rerun()
+
+# ======================
+# AGREGAR TAREA
+# ======================
 with col2:
-    if st.button("Exportar HTML"):
-        html = build_ms_project_gantt_html(full_df)
-        export_gantt_html(html, REPORT_PATH)
-        st.success("Exportado ✅")
+    if st.button("➕ Nueva Tarea") and selected_project != "(sin proyectos)":
+
+        new_task = pd.DataFrame([{
+            "nivel": "Tarea",
+            "project_name": selected_project,
+            "item_name": "Nueva tarea",
+            "responsible": "",
+            "start_date": datetime.today().date(),
+            "end_date": datetime.today().date(),
+            "progress": 0
+        }])
+
+        df = pd.concat([df, new_task], ignore_index=True)
+        guardar_todo(df)
+        st.rerun()
+
+
+# ======================
+# EDITOR (SOLO PROYECTO SELECCIONADO)
+# ======================
+st.subheader("Editor")
+
+df_edit = df[df["project_name"] == selected_project]
+
+edited = st.data_editor(
+    df_edit,
+    use_container_width=True,
+    num_rows="dynamic",
+    key="main_editor"
+)
+
+# ======================
+# GUARDAR EDICIÓN
+# ======================
+if st.button("💾 Guardar Cambios"):
+
+    df_total = df.copy()
+
+    df_total = df_total[~df_total["project_name"].eq(selected_project)]
+    df_total = pd.concat([df_total, edited], ignore_index=True)
+
+    guardar_todo(df_total)
+
 
 # ======================
 # GANTT
 # ======================
 st.subheader("Timeline")
 
-if not full_df.empty:
+if not df.empty:
 
-    start_date = st.date_input("Inicio", value=full_df["start_date"].min())
-    end_date = st.date_input("Fin", value=full_df["end_date"].max())
+    start_series = pd.to_datetime(df["start_date"], errors="coerce").dropna()
+    end_series = pd.to_datetime(df["end_date"], errors="coerce").dropna()
 
-    html = build_ms_project_gantt_html(full_df, start_date, end_date)
+    start_default = start_series.min().date() if not start_series.empty else datetime.today().date()
+    end_default = end_series.max().date() if not end_series.empty else datetime.today().date()
 
+    start_date = st.date_input("Inicio", value=start_default)
+    end_date = st.date_input("Fin", value=end_default)
+
+    html = build_ms_project_gantt_html(df, start_date, end_date)
     components.html(html, height=650, scrolling=False)
 
 else:
