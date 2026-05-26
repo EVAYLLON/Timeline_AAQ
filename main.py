@@ -97,6 +97,10 @@ with col1:
         guardar(pd.concat([df, new], ignore_index=True))
         st.rerun()
 
+st.write("DATA A GUARDAR:")
+st.write(df.tail())
+
+
 # ✅ NUEVA TAREA
 with col2:
     if selected and st.button("➕ Tarea"):
