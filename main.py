@@ -43,19 +43,37 @@ def guardar(df):
 
     df = df.copy()
 
-    # ✅ limpieza dura
+    # ======================
+    # LIMPIEZA FUERTE (CRÍTICO)
+    # ======================
     df = df.replace({pd.NA: None})
+
+    # ✅ convertir NaN reales
     df = df.where(pd.notnull(df), None)
 
-    # ✅ strings
-    for col in ["project_name","item_name","responsible","document_url"]:
-        df[col] = df[col].fillna("").astype(str)
+    # ✅ strings obligatorios
+    for col in ["nivel","project_name","item_name","responsible","document_url"]:
+        df[col] = df[col].apply(lambda x: str(x) if x is not None else "")
 
-    # ✅ eliminar filas inválidas
-    df = df[df["item_name"] != ""]
-    df = df[df["project_name"] != ""]
+    # ✅ eliminar filas vacías
+    df = df[df["item_name"].str.strip() != ""]
+    df = df[df["project_name"].str.strip() != ""]
 
-    # ✅ asegurar que TODA tarea tenga proyecto válido
+    # ✅ fechas seguras
+    df["start_date"] = pd.to_datetime(df["start_date"], errors="coerce")
+    df["end_date"] = pd.to_datetime(df["end_date"], errors="coerce")
+
+    # ✅ eliminar fechas inválidas
+    df = df.dropna(subset=["start_date","end_date"])
+
+    # ✅ convertir fechas a string limpio
+    df["start_date"] = df["start_date"].dt.strftime("%Y-%m-%d")
+    df["end_date"] = df["end_date"].dt.strftime("%Y-%m-%d")
+
+    # ✅ progreso correcto
+    df["progress"] = pd.to_numeric(df["progress"], errors="coerce").fillna(0)
+
+    # ✅ eliminar tareas sin proyecto válido
     proyectos = df[df["nivel"] == "Proyecto"]["project_name"].unique()
 
     df = df[
@@ -63,25 +81,30 @@ def guardar(df):
         (df["project_name"].isin(proyectos))
     ]
 
-    # ✅ fechas seguras
-    df["start_date"] = pd.to_datetime(df["start_date"], errors="coerce").dt.strftime("%Y-%m-%d")
-    df["end_date"] = pd.to_datetime(df["end_date"], errors="coerce").dt.strftime("%Y-%m-%d")
-
-    # ✅ progreso
-    df["progress"] = pd.to_numeric(df["progress"], errors="coerce").fillna(0)
-
-    df["updated_at"] = datetime.utcnow().isoformat()
-
-    # ✅ eliminar duplicados
+    # ✅ eliminar duplicados internos
     df = df.drop_duplicates(
         subset=["project_name","item_name","nivel"],
         keep="last"
     )
 
-    supabase.table("projects").upsert(
-        df.to_dict("records"),
-        on_conflict="project_name,item_name,nivel"
-    ).execute()
+    # ✅ timestamp
+    df["updated_at"] = datetime.utcnow().isoformat()
+
+    # ======================
+    # CONVERSIÓN FINAL JSON
+    # ======================
+    data = df.to_dict(orient="records")
+
+    try:
+        supabase.table("projects").upsert(
+            data,
+            on_conflict="project_name,item_name,nivel"
+        ).execute()
+
+    except Exception as e:
+        st.error("❌ Error al guardar en Supabase")
+        st.write(data)  # 👈 te muestra exactamente qué se envía
+        st.write(e)
 
 
 # ======================
