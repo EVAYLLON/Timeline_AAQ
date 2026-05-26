@@ -147,7 +147,7 @@ def build_ms_project_gantt_html(df, start_date=None, end_date=None):
 
 .gantt-wrapper {{
     font-family: "Segoe UI", Arial;
-    font-size: 13px;
+    font-size: 14px;
     border: 1px solid #ccc;
 }}
 
