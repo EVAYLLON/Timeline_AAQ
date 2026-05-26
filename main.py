@@ -245,6 +245,23 @@ if selected:
 # GANTT
 # ======================
 st.subheader("Timeline")
+# ======================
+# FILTRO DE FECHAS GANTT
+# ======================
+
+col_f1, col_f2 = st.columns(2)
+
+with col_f1:
+    fecha_inicio = st.date_input(
+        "📅 Ver desde",
+        value=pd.to_datetime(df["start_date"]).min() if not df.empty else datetime.today()
+    )
+
+with col_f2:
+    fecha_fin = st.date_input(
+        "📅 Ver hasta",
+        value=pd.to_datetime(df["end_date"]).max() if not df.empty else datetime.today()
+    )
 
 if not df.empty:
     df["timeline_status"] = df.apply(timeline, axis=1)
