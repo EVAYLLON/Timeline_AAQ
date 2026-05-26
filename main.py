@@ -183,6 +183,29 @@ if not df.empty:
     df["start_date"] = pd.to_datetime(df["start_date"], errors="coerce")
     df["end_date"] = pd.to_datetime(df["end_date"], errors="coerce")
 
+
+    # ✅ crear timeline_status SI NO EXISTE
+    def timeline(row):
+        today = pd.Timestamp.today().normalize()
+
+        if row["progress"] >= 100:
+            return "Completado"
+
+        end = pd.to_datetime(row["end_date"], errors="coerce")
+
+        if pd.isna(end):
+            return ""
+
+        if end < today:
+            return "Vencido"
+        elif (end - today).days <= 5:
+            return "En riesgo"
+
+        return "En plazo"
+
+    # ✅ agregar columna
+    df["timeline_status"] = df.apply(timeline, axis=1)
+
     html = build_ms_project_gantt_html(df)
 
     components.html(html, height=650)
