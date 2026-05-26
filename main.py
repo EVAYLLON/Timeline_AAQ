@@ -19,8 +19,10 @@ supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 def cargar():
     res = supabase.table("projects").select("*").execute()
 
-    columnas = ["nivel","project_name","item_name","responsible",
-                "start_date","end_date","progress"]
+    columnas = [
+        "nivel","project_name","item_name",
+        "responsible","start_date","end_date","progress"
+    ]
 
     if not res.data:
         return pd.DataFrame(columns=columnas)
@@ -34,7 +36,7 @@ def cargar():
     return df
 
 # ======================
-# INSERT SIMPLE ✅
+# INSERT LIMPIO ✅
 # ======================
 def insertar_registro(row):
     supabase.table("projects").insert(row).execute()
@@ -89,8 +91,9 @@ if st.button("✅ Crear proyecto"):
 
         nuevo = {
             "nivel": "Proyecto",
-            "project_name": nuevo_nombre,
-            "item_name": nuevo_nombre,
+            "project_name": nuevo_nombre.strip(),
+            "item_name": nuevo_nombre.strip(),
+            "responsible": "",
             "start_date": datetime.today().strftime("%Y-%m-%d"),
             "end_date": datetime.today().strftime("%Y-%m-%d"),
             "progress": 0
@@ -122,6 +125,7 @@ with col1:
             "nivel": "Tarea",
             "project_name": selected,
             "item_name": "Nueva tarea",
+            "responsible": "",
             "start_date": datetime.today().strftime("%Y-%m-%d"),
             "end_date": datetime.today().strftime("%Y-%m-%d"),
             "progress": 0
@@ -149,7 +153,20 @@ if selected:
 
     st.subheader("Editor")
 
-    df_edit = df[df["project_name"] == selected].copy()
+    df_edit = df[df["project_name"] == selected][[
+        "nivel","item_name","responsible",
+        "start_date","end_date","progress"
+    ]].copy()
+
+    # ✅ LIMPIEZA CRÍTICA (SOLUCIONA ERROR STREAMLIT)
+    df_edit["nivel"] = df_edit["nivel"].fillna("Tarea").astype(str)
+    df_edit["item_name"] = df_edit["item_name"].fillna("").astype(str)
+    df_edit["responsible"] = df_edit["responsible"].fillna("").astype(str)
+
+    df_edit["start_date"] = pd.to_datetime(df_edit["start_date"], errors="coerce")
+    df_edit["end_date"] = pd.to_datetime(df_edit["end_date"], errors="coerce")
+
+    df_edit["progress"] = pd.to_numeric(df_edit["progress"], errors="coerce").fillna(0)
 
     edited = st.data_editor(
         df_edit,
@@ -170,9 +187,28 @@ if selected:
             .eq("project_name", selected)\
             .execute()
 
-        # insertar de nuevo (limpio)
+        # insertar limpio
         for _, row in edited.iterrows():
-            insertar_registro(row.to_dict())
+
+            registro = {
+                "nivel": "Proyecto" if row["item_name"] == selected else "Tarea",
+                "project_name": selected,
+                "item_name": str(row["item_name"]),
+                "responsible": str(row["responsible"]),
+                "start_date": (
+                    pd.to_datetime(row["start_date"]).strftime("%Y-%m-%d")
+                    if pd.notna(row["start_date"])
+                    else datetime.today().strftime("%Y-%m-%d")
+                ),
+                "end_date": (
+                    pd.to_datetime(row["end_date"]).strftime("%Y-%m-%d")
+                    if pd.notna(row["end_date"])
+                    else datetime.today().strftime("%Y-%m-%d")
+                ),
+                "progress": float(row["progress"])
+            }
+
+            insertar_registro(registro)
 
         st.success("Guardado ✅")
         st.rerun()
