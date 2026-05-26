@@ -187,32 +187,26 @@ with col3:
 # ======================
 # EDITOR LIMPIO
 # ======================
+
 st.subheader("Editor")
 
 df_edit = df[df["project_name"] == selected][[
     "item_name","responsible","start_date","end_date","progress","document_url"
-]]
+]].copy()
 
-edit = st.data_editor(df_edit, use_container_width=True)
+# ✅ 🔥 CLAVE → asegurar datetime para calendario
+df_edit["start_date"] = pd.to_datetime(df_edit["start_date"], errors="coerce")
+df_edit["end_date"] = pd.to_datetime(df_edit["end_date"], errors="coerce")
 
-# ======================
-# GUARDAR EDICIÓN
-# ======================
-if st.button("💾 Guardar cambios"):
-
-    df_total = df[df["project_name"] != selected]
-
-    edit["project_name"] = selected
-    edit["nivel"] = edit["item_name"].apply(
-        lambda x: "Proyecto" if x == selected else "Tarea"
-    )
-
-    df_total = pd.concat([df_total, edit])
-
-    guardar(df_total)
-
-    st.success("Guardado ✅")
-
+edit = st.data_editor(
+    df_edit,
+    use_container_width=True,
+    num_rows="dynamic",
+    column_config={
+        "start_date": st.column_config.DateColumn("Inicio"),
+        "end_date": st.column_config.DateColumn("Fin"),
+    }
+)
 
 # ======================
 # GANTT
@@ -224,11 +218,19 @@ if not df.empty:
     df["estado"] = df["progress"].apply(estado)
     df["timeline_status"] = df.apply(timeline, axis=1)
 
-    start = pd.to_datetime(df["start_date"], errors="coerce").min()
-    end = pd.to_datetime(df["end_date"], errors="coerce").max()
+    start_series = pd.to_datetime(df["start_date"], errors="coerce").dropna()
+    end_series = pd.to_datetime(df["end_date"], errors="coerce").dropna()
 
-    start_date = st.date_input("Inicio", value=start)
-    end_date = st.date_input("Fin", value=end)
+    start_date = st.date_input(
+        "Inicio",
+        value=start_series.min().date() if not start_series.empty else datetime.today().date()
+    )
+
+    end_date = st.date_input(
+        "Fin",
+        value=end_series.max().date() if not end_series.empty else datetime.today().date()
+    )
+
 
     html = build_ms_project_gantt_html(df, start_date, end_date)
 
