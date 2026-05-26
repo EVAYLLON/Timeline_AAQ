@@ -18,25 +18,17 @@ supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 # ======================
 def cargar():
     res = supabase.table("projects").select("*").execute()
-
-    if not res.data:
-        return pd.DataFrame(columns=[
-            "nivel","project_name","item_name",
-            "responsible","start_date","end_date","progress"
-        ])
-
-    return pd.DataFrame(res.data)
+    return pd.DataFrame(res.data if res.data else [])
 
 # ======================
-# GUARDAR
+# GUARDAR (SEGURO)
 # ======================
 def guardar(df):
 
-    df = df.copy()
-
-    # ✅ evitar guardar vacío
     if df.empty:
         return
+
+    df = df.copy()
 
     df = df.fillna("")
 
@@ -52,7 +44,6 @@ def guardar(df):
 
     data = df.to_dict("records")
 
-    # ✅ evitar enviar lista vacía
     if len(data) == 0:
         return
 
@@ -60,6 +51,7 @@ def guardar(df):
         data,
         on_conflict="project_name,item_name,nivel"
     ).execute()
+
 # ======================
 # TIMELINE
 # ======================
@@ -91,39 +83,46 @@ st.title("Project Tracker ✅")
 df = cargar()
 
 # ======================
-# SELECTOR
+# SELECTOR PROYECTO
 # ======================
 proyectos = df[df["nivel"] == "Proyecto"]["project_name"].unique()
 
-selected = None
-if len(proyectos) > 0:
-    selected = st.selectbox("Proyecto", proyectos)
+selected = st.selectbox("Proyecto", proyectos) if len(proyectos) > 0 else None
 
 # ======================
-# BOTONES (SOLO UNA VEZ 🔥)
+# CREAR PROYECTO CON NOMBRE
 # ======================
-col1, col2, col3 = st.columns(3)
+st.subheader("Crear nuevo proyecto")
 
-# ➕ PROYECTO
-with col1:
-    if st.button("➕ Proyecto", key="btn_add_project"):
-        nombre = f"Proyecto {len(proyectos)+1}"
+nuevo_nombre = st.text_input("Nombre del proyecto")
 
+if st.button("✅ Crear proyecto"):
+
+    if nuevo_nombre.strip() == "":
+        st.warning("Ingresa un nombre válido")
+    else:
         new = pd.DataFrame([{
             "nivel": "Proyecto",
-            "project_name": nombre,
-            "item_name": nombre,
+            "project_name": nuevo_nombre,
+            "item_name": nuevo_nombre,
             "start_date": datetime.today(),
             "end_date": datetime.today(),
             "progress": 0
         }])
 
         guardar(pd.concat([df, new], ignore_index=True))
+        st.success("Proyecto creado ✅")
         st.rerun()
 
+# ======================
+# BOTONES
+# ======================
+col1, col2 = st.columns(2)
+
 # ➕ TAREA
-with col2:
-    if selected and st.button("➕ Tarea", key="btn_add_task"):
+with col1:
+    if selected and st.button("➕ Tarea"):
+
         new = pd.DataFrame([{
             "nivel": "Tarea",
             "project_name": selected,
@@ -136,9 +135,9 @@ with col2:
         guardar(pd.concat([df, new], ignore_index=True))
         st.rerun()
 
-# 🗑 BORRAR PROYECTO
-with col3:
-    if selected and st.button("🗑️ Eliminar Proyecto", key="btn_delete_project"):
+# 🗑 ELIMINAR PROYECTO
+with col2:
+    if selected and st.button("🗑️ Eliminar Proyecto"):
 
         supabase.table("projects")\
             .delete()\
@@ -146,15 +145,7 @@ with col3:
             .execute()
 
         st.success(f"{selected} eliminado ✅")
-
-        # ✅ SI YA NO QUEDAN PROYECTOS → recargar limpio
-        remaining = supabase.table("projects").select("*").execute().data
-
-        if not remaining:
-            st.warning("No hay proyectos. Crea uno 👇")
-
         st.rerun()
-
 
 # ======================
 # EDITOR
@@ -168,9 +159,6 @@ if selected:
         "start_date","end_date","progress"
     ]].copy()
 
-    df_edit["start_date"] = pd.to_datetime(df_edit["start_date"], errors="coerce")
-    df_edit["end_date"] = pd.to_datetime(df_edit["end_date"], errors="coerce")
-
     edited = st.data_editor(
         df_edit,
         num_rows="dynamic",
@@ -182,9 +170,8 @@ if selected:
         }
     )
 
-    if st.button("💾 Guardar cambios", key="btn_save"):
+    if st.button("💾 Guardar cambios"):
 
-        edited = edited.copy()
         edited["project_name"] = selected
 
         # 🔥 FORZAR NIVELES
@@ -197,7 +184,7 @@ if selected:
 
         guardar(df_total)
 
-        st.success("✅ Guardado")
+        st.success("Guardado ✅")
         st.rerun()
 
 # ======================
