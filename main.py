@@ -47,11 +47,7 @@ def guardar(df):
     if len(data) == 0:
         return
 
-    supabase.table("projects").upsert(
-        data,
-        on_conflict="project_name,item_name,nivel"
-    ).execute()
-
+    supabase.table("projects").insert(data).execute()
 # ======================
 # TIMELINE
 # ======================
