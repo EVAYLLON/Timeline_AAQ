@@ -189,19 +189,24 @@ if selected:
             .execute()
 
         # ✅ insertar limpio con validación
-        for i, row in edited.iterrows():
+        for _, row in edited.iterrows():
 
             item = str(row.get("item_name", "")).strip()
 
-            # ✅ NO ignorar el proyecto principal
             if item == "":
                 continue
 
             start = pd.to_datetime(row.get("start_date"), errors="coerce")
             end = pd.to_datetime(row.get("end_date"), errors="coerce")
 
+            # ✅ FIX CRÍTICO
+            if item == selected:
+                nivel = "Proyecto"
+            else:
+                nivel = "Tarea"
+
             registro = {
-                "nivel": "Proyecto" if i == 0 else "Tarea",   # 🔥 clave
+                "nivel": nivel,
                 "project_name": selected,
                 "item_name": item,
                 "responsible": str(row.get("responsible") or ""),
@@ -211,6 +216,7 @@ if selected:
             }
 
             insertar_registro(registro)
+
 
 # ======================
 # GANTT
