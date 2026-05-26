@@ -2,6 +2,7 @@ from pathlib import Path
 import pandas as pd
 import streamlit as st
 import streamlit.components.v1 as components
+from datetime import datetime
 from supabase import create_client
 from gantt import build_ms_project_gantt_html, export_gantt_html
 
@@ -26,12 +27,11 @@ def cargar_datos():
             "start_date","end_date","progress","estado","document_url"
         ])
 
-    df = pd.DataFrame(data)
+    return pd.DataFrame(data)
 
-    return df
 
 # ======================
-# GUARDAR DATOS (FIX)
+# UPSERT PRO
 # ======================
 def guardar_todo(df):
 
@@ -42,27 +42,36 @@ def guardar_todo(df):
 
     df_clean = df.reindex(columns=columnas_validas)
 
-    # ✅ reemplazar NaN → None
-    df_clean = df_clean.where(pd.notnull(df_clean), None)
+    # 🔥 CLAVE → eliminar NaN REAL
+    df_clean = df_clean.replace({pd.NA: None})
+    df_clean = df_clean.where(df_clean.notnull(), None)
 
-    # ✅ fechas SOLO día (sin hora)
+    # ✅ fechas solo día
     df_clean["start_date"] = pd.to_datetime(df_clean["start_date"], errors="coerce").dt.date
     df_clean["end_date"] = pd.to_datetime(df_clean["end_date"], errors="coerce").dt.date
 
-    # ✅ convertir a string limpio
     df_clean["start_date"] = df_clean["start_date"].astype(str)
     df_clean["end_date"] = df_clean["end_date"].astype(str)
 
-    # ✅ progress válido
     df_clean["progress"] = pd.to_numeric(df_clean["progress"], errors="coerce").fillna(0)
+
+    # ✅ updated_at
+    df_clean["updated_at"] = datetime.utcnow().isoformat()
 
     data = df_clean.to_dict(orient="records")
 
     try:
-        supabase.table("projects").insert(data).execute()
+        supabase.table("projects").upsert(
+            data,
+            on_conflict="project_name,item_name,nivel"
+        ).execute()
+
+        st.success("✅ Guardado correctamente (UPsert)")
+
     except Exception as e:
-        st.error("❌ Error al guardar en Supabase")
+        st.error("❌ Error Supabase")
         st.write(e)
+
 
 # ======================
 # CONFIG
@@ -77,19 +86,16 @@ st.title("Project Tracker (Jerarquía real)")
 # FUNCIONES
 # ======================
 def calcular_estado(x):
-    try:
-        x = float(x)
-    except:
-        x = 0
-
+    x = float(x) if pd.notna(x) else 0
     if x >= 100:
         return "Completado"
     elif x <= 0:
         return "No iniciado"
-    else:
-        return "En curso"
+    return "En curso"
+
 
 def calcular_timeline(row):
+
     today = pd.Timestamp.today().normalize()
 
     progress = pd.to_numeric(row.get("progress", 0), errors="coerce")
@@ -107,8 +113,8 @@ def calcular_timeline(row):
         return "Vencido"
     elif (end - today).days <= 5:
         return "En riesgo"
-    else:
-        return "En plazo"
+    return "En plazo"
+
 
 # ======================
 # DATA
@@ -125,67 +131,39 @@ for col in ["nivel","project_name","item_name","responsible"]:
 df["estado"] = df["progress"].apply(calcular_estado)
 df["timeline_status"] = df.apply(calcular_timeline, axis=1)
 
-# ✅ SOLO fecha (no hora)
 df["start_date"] = df["start_date"].dt.date
 df["end_date"] = df["end_date"].dt.date
 
 # ======================
-# EDITOR POR PROYECTO (ORIGINAL)
+# EDITOR
 # ======================
 st.subheader("Editor por Proyecto")
 
-df_display = df.drop(
-    columns=["id","item_id","parent_id","project_id","nivel_order"],
-    errors="ignore"
-)
-
-projects_list = df_display["project_name"].dropna().unique()
+projects = df["project_name"].unique()
 edited_blocks = []
 
-for project in projects_list:
+for project in projects:
 
-    proj_df = df_display[df_display["project_name"] == project].copy()
+    proj_df = df[df["project_name"] == project]
 
-    with st.expander(f"📁 {project}", expanded=False):
+    with st.expander(f"📁 {project}", expanded=True):
 
-        edited_proj = st.data_editor(
+        edited = st.data_editor(
             proj_df,
             num_rows="dynamic",
             use_container_width=True,
-            key=f"editor_{project}",
-
-            column_config={
-                "nivel": st.column_config.SelectboxColumn(
-                    "Nivel",
-                    options=["Proyecto","Tarea","Subtarea"]
-                ),
-                "start_date": st.column_config.DateColumn("Inicio"),
-                "end_date": st.column_config.DateColumn("Fin"),
-                "estado": st.column_config.TextColumn("Estado", disabled=True),
-                "timeline_status": st.column_config.TextColumn("Estado plazo", disabled=True)
-            },
-            disabled=["estado","timeline_status"]
+            key=f"editor_{project}"
         )
 
-        edited_blocks.append(edited_proj)
+        edited_blocks.append(edited)
 
 # ======================
-# RECONSTRUCCIÓN (FIX)
+# RECONSTRUCCIÓN
 # ======================
 if edited_blocks:
     full_df = pd.concat(edited_blocks, ignore_index=True)
 else:
     full_df = df.copy()
-
-# ======================
-# LIMPIEZA FINAL
-# ======================
-full_df["start_date"] = pd.to_datetime(full_df["start_date"], errors="coerce")
-full_df["end_date"] = pd.to_datetime(full_df["end_date"], errors="coerce")
-full_df["progress"] = pd.to_numeric(full_df["progress"], errors="coerce").fillna(0)
-
-full_df["estado"] = full_df["progress"].apply(calcular_estado)
-full_df["timeline_status"] = full_df.apply(calcular_timeline, axis=1)
 
 # ======================
 # BOTONES
@@ -195,7 +173,6 @@ col1, col2 = st.columns(2)
 with col1:
     if st.button("Guardar cambios"):
         guardar_todo(full_df)
-        st.success("Guardado en Supabase ✅")
 
 with col2:
     if st.button("Exportar HTML"):
@@ -218,4 +195,4 @@ if not full_df.empty:
     components.html(html, height=650, scrolling=False)
 
 else:
-    st.warning("⚠️ No hay datos para mostrar")
+    st.warning("⚠️ No hay datos")
