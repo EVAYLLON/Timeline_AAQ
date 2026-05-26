@@ -143,9 +143,10 @@ with col1:
             "end_date": datetime.today(),
             "progress": 0
         }])
-
-        guardar(pd.concat([df, new]))
+        guardar(pd.concat([df, new], ignore_index=True))
+        st.success("✅ Creado correctamente")
         st.rerun()
+
 
 # ======================
 # NUEVA TAREA
@@ -255,7 +256,13 @@ if not df.empty:
         )
     ]
 
-    html = build_ms_project_gantt_html(df)
+    df_gantt = df.copy()
+
+    # ✅ usar datos ya actualizados
+    df_gantt["start_date"] = pd.to_datetime(df_gantt["start_date"], errors="coerce")
+    df_gantt["end_date"] = pd.to_datetime(df_gantt["end_date"], errors="coerce")
+
+    html = build_ms_project_gantt_html(df_gantt)
 
 
 
