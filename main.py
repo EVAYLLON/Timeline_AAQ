@@ -27,7 +27,12 @@ def guardar(df):
 
     df = df.copy()
 
+    # ✅ evitar guardar vacío
+    if df.empty:
+        return
+
     df = df.fillna("")
+
     df["start_date"] = pd.to_datetime(df["start_date"], errors="coerce").fillna(datetime.today())
     df["end_date"] = pd.to_datetime(df["end_date"], errors="coerce").fillna(datetime.today())
 
@@ -38,11 +43,16 @@ def guardar(df):
 
     df["updated_at"] = datetime.utcnow().isoformat()
 
+    data = df.to_dict("records")
+
+    # ✅ evitar enviar lista vacía
+    if len(data) == 0:
+        return
+
     supabase.table("projects").upsert(
-        df.to_dict("records"),
+        data,
         on_conflict="project_name,item_name,nivel"
     ).execute()
-
 # ======================
 # TIMELINE
 # ======================
@@ -129,7 +139,15 @@ with col3:
             .execute()
 
         st.success(f"{selected} eliminado ✅")
+
+        # ✅ SI YA NO QUEDAN PROYECTOS → recargar limpio
+        remaining = supabase.table("projects").select("*").execute().data
+
+        if not remaining:
+            st.warning("No hay proyectos. Crea uno 👇")
+
         st.rerun()
+
 
 # ======================
 # EDITOR
