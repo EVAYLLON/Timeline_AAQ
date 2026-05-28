@@ -13,6 +13,12 @@ SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJ
 
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
+
+
+if st.button("🔄 Reset datos"):
+    st.session_state.clear()
+    st.rerun()
+
 # ======================
 # CARGAR
 # ======================
@@ -77,7 +83,10 @@ st.title("Project Tracker ✅")
 if "df_temp" not in st.session_state:
     st.session_state["df_temp"] = cargar()
 
-df = st.session_state.get("df_temp", cargar())
+
+df = cargar()
+st.session_state["df_temp"] = df
+
 df = df.copy()
 df["project_name"] = df["project_name"].astype(str).str.strip()
 
