@@ -197,16 +197,19 @@ if selected:
             .eq("project_name", selected)\
             .execute()
 
-        # ✅ REINSERTAR PROYECTO
+
+        row_proyecto = edited[edited["nivel"] == "Proyecto"].iloc[0]
+
         insertar({
             "nivel": "Proyecto",
             "project_name": selected,
             "item_name": selected,
-            "responsible": "",
-            "start_date": datetime.today().strftime("%Y-%m-%d"),
-            "end_date": datetime.today().strftime("%Y-%m-%d"),
-            "progress": 0
+            "responsible": str(row_proyecto.get("responsible","")),
+            "start_date": pd.to_datetime(row_proyecto["start_date"]).strftime("%Y-%m-%d"),
+            "end_date": pd.to_datetime(row_proyecto["end_date"]).strftime("%Y-%m-%d"),
+            "progress": int(row_proyecto.get("progress",0))
         })
+
 
         # ✅ REINSERTAR TAREAS
         for _, row in edited.iterrows():
@@ -242,26 +245,34 @@ if not df.empty:
     # ======================
     # SELECTOR DE FECHAS ✅
     # ======================
+
+if "fecha_inicio" not in st.session_state:
+    st.session_state["fecha_inicio"] = df["start_date"].min()
+
+if "fecha_fin" not in st.session_state:
+    st.session_state["fecha_fin"] = df["end_date"].max()
+
+
+
     col_f1, col_f2 = st.columns(2)
 
     with col_f1:
         fecha_inicio = st.date_input(
             "📅 Ver desde",
-            value=df["start_date"].min()
+            value=st.session_state["fecha_inicio"]
         )
 
-    with col_f2:
         fecha_fin = st.date_input(
             "📅 Ver hasta",
-            value=df["end_date"].max()
+            value=st.session_state["fecha_fin"]
         )
 
-    # ✅ FILTRO POR RANGO
-    df_filtrado = df[
-        (df["end_date"] >= pd.to_datetime(fecha_inicio)) &
-        (df["start_date"] <= pd.to_datetime(fecha_fin))
-    ].copy()
+        # ✅ Guardar en estado
+        st.session_state["fecha_inicio"] = fecha_inicio
+        st.session_state["fecha_fin"] = fecha_fin
 
+    # ✅ FILTRO POR RANGO
+    df_filtrado = df.copy()
     # ✅ timeline status
     df_filtrado["timeline_status"] = df_filtrado.apply(timeline, axis=1)
 
