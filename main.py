@@ -98,14 +98,19 @@ nuevo_nombre = st.text_input("Nombre del proyecto")
 
 if st.button("✅ Crear proyecto"):
 
-    if nuevo_nombre.strip() == "":
-        st.warning("Ingresa nombre válido")
-    else:
+    nombre = nuevo_nombre.strip()
 
+    if nombre == "":
+        st.warning("Ingresa nombre válido")
+
+    elif nombre in proyectos:
+        st.warning("⚠️ El proyecto ya existe")
+
+    else:
         nuevo = {
             "nivel": "Proyecto",
-            "project_name": nuevo_nombre.strip(),
-            "item_name": nuevo_nombre.strip(),
+            "project_name": nombre,
+            "item_name": nombre,
             "responsible": "",
             "start_date": datetime.today().strftime("%Y-%m-%d"),
             "end_date": datetime.today().strftime("%Y-%m-%d"),
@@ -114,7 +119,6 @@ if st.button("✅ Crear proyecto"):
 
         insertar_registro(nuevo)
 
-        # 🔥 FORZAR ACTUALIZACIÓN DESDE SUPABASE
         st.session_state["df_temp"] = cargar()
 
         st.success("Proyecto creado ✅")
@@ -217,6 +221,18 @@ if selected:
 
 
 if st.button("💾 Guardar cambios"):
+    # ✅ insertar UNA sola fila de proyecto
+    registro_proyecto = {
+        "nivel": "Proyecto",
+        "project_name": selected,
+        "item_name": selected,
+        "responsible": "",
+        "start_date": datetime.today().strftime("%Y-%m-%d"),
+        "end_date": datetime.today().strftime("%Y-%m-%d"),
+        "progress": 0
+    }
+
+    insertar_registro(registro_proyecto)
 
     # ✅ borrar proyecto actual
     supabase.table("projects")\
@@ -225,49 +241,46 @@ if st.button("💾 Guardar cambios"):
         .execute()
 
     # ✅ insertar limpio con validación
-    for _, row in edited.iterrows():
+for _, row in edited.iterrows():
 
-        item = str(row.get("item_name", "")).strip()
+    item = str(row.get("item_name", "")).strip()
 
-        if item == "":
-            continue
+    if item == "":
+        continue
 
-        start = pd.to_datetime(row.get("start_date"), errors="coerce")
-        end = pd.to_datetime(row.get("end_date"), errors="coerce")
+    # 🔥 SALTAR PROYECTOS (YA INSERTAMOS UNO ARRIBA)
+    if item == selected:
+        continue
 
-        # ✅ FIX REAL
-        nivel = str(row.get("nivel", "Tarea")).strip()
-        if nivel not in ["Proyecto", "Tarea", "Subtarea"]:
-            nivel = "Tarea"
+    # ✅ todo lo demás es tarea
+    nivel = "Tarea"
 
-        # ✅ fechas seguras
-        try:
-            start_str = pd.to_datetime(row.get("start_date")).strftime("%Y-%m-%d")
-        except:
-            start_str = datetime.today().strftime("%Y-%m-%d")
+    try:
+        start_str = pd.to_datetime(row.get("start_date")).strftime("%Y-%m-%d")
+    except:
+        start_str = datetime.today().strftime("%Y-%m-%d")
 
-        try:
-            end_str = pd.to_datetime(row.get("end_date")).strftime("%Y-%m-%d")
-        except:
-            end_str = datetime.today().strftime("%Y-%m-%d")
+    try:
+        end_str = pd.to_datetime(row.get("end_date")).strftime("%Y-%m-%d")
+    except:
+        end_str = datetime.today().strftime("%Y-%m-%d")
 
-        # ✅ progreso seguro
-        try:
-            prog = int(float(row.get("progress") or 0))
-        except:
-            prog = 0
+    try:
+        prog = int(float(row.get("progress") or 0))
+    except:
+        prog = 0
 
-        registro = {
-            "nivel": nivel,
-            "project_name": selected,  # ✅ ESTO ESTÁ BIEN
-            "item_name": item,
-            "responsible": str(row.get("responsible") or ""),
-            "start_date": start_str,
-            "end_date": end_str,
-            "progress": prog
-        }
+    registro = {
+        "nivel": nivel,
+        "project_name": selected,
+        "item_name": item,
+        "responsible": str(row.get("responsible") or ""),
+        "start_date": start_str,
+        "end_date": end_str,
+        "progress": prog
+    }
 
-        insertar_registro(registro)
+    insertar_registro(registro)
 
 
 # ======================
