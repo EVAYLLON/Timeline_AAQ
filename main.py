@@ -9,15 +9,9 @@ from gantt import build_ms_project_gantt_html
 # SUPABASE
 # ======================
 SUPABASE_URL = "https://brrghdszvwvwxwouvqgl.supabase.co"
-SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJycmdoZHN6dnd2d3h3b3V2cWdsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkyMTc0ODMsImV4cCI6MjA5NDc5MzQ4M30.dnt7f4qTGfbr66JJiKg8TpPmgJ_Et31_OLVz3_CBpdA"
+SUPABASE_KEY = "TU_KEY"
 
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
-
-
-
-if st.button("🔄 Reset datos"):
-    st.session_state.clear()
-    st.rerun()
 
 # ======================
 # CARGAR
@@ -25,54 +19,22 @@ if st.button("🔄 Reset datos"):
 def cargar():
     res = supabase.table("projects").select("*").execute()
 
-    columnas = [
-        "nivel","project_name","item_name",
-        "responsible","start_date","end_date","progress"
-    ]
-
     if not res.data:
-        return pd.DataFrame(columns=columnas)
+        return pd.DataFrame(columns=[
+            "nivel","project_name","item_name",
+            "responsible","start_date","end_date","progress"
+        ])
 
     df = pd.DataFrame(res.data)
-
-    for col in columnas:
-        if col not in df.columns:
-            df[col] = None
+    df["project_name"] = df["project_name"].astype(str).str.strip()
 
     return df
 
 # ======================
-# INSERT LIMPIO ✅
+# INSERT
 # ======================
-def insertar_registro(row):
-    try:
-        supabase.table("projects").insert(row).execute()
-    except Exception as e:
-        st.error("Error al insertar:")
-        st.write(row)
-        st.write(e)
-
-# ======================
-# TIMELINE
-# ======================
-def timeline(row):
-    today = pd.Timestamp.today().normalize()
-
-    if row["progress"] >= 100:
-        return "Completado"
-
-    end = pd.to_datetime(row["end_date"], errors="coerce")
-
-    if pd.isna(end):
-        return ""
-
-    if end < today:
-        return "Vencido"
-
-    if (end - today).days <= 5:
-        return "En riesgo"
-
-    return "En plazo"
+def insertar(row):
+    supabase.table("projects").insert(row).execute()
 
 # ======================
 # UI
@@ -80,43 +42,31 @@ def timeline(row):
 st.set_page_config(layout="wide")
 st.title("Project Tracker ✅")
 
-if "df_temp" not in st.session_state:
-    st.session_state["df_temp"] = cargar()
-
-
+# 🔥 SIEMPRE DESDE DB (NO session_state)
 df = cargar()
-st.session_state["df_temp"] = df
 
-df = df.copy()
-df["project_name"] = df["project_name"].astype(str).str.strip()
-
-if "project_name" not in df.columns:
-    df["project_name"] = ""
 # ======================
 # PROYECTOS
 # ======================
-df["project_name"] = df.get("project_name", "")
-proyectos = df[df["nivel"] == "Proyecto"]["project_name"].dropna().unique()
+proyectos = df[df["nivel"] == "Proyecto"]["project_name"].unique()
 
 # ======================
 # CREAR PROYECTO
 # ======================
 st.subheader("Crear nuevo proyecto")
-
-nuevo_nombre = st.text_input("Nombre del proyecto")
+nuevo = st.text_input("Nombre del proyecto")
 
 if st.button("✅ Crear proyecto"):
-
-    nombre = nuevo_nombre.strip()
+    nombre = nuevo.strip()
 
     if nombre == "":
-        st.warning("Ingresa nombre válido")
+        st.warning("Nombre inválido")
 
     elif nombre in proyectos:
-        st.warning("⚠️ El proyecto ya existe")
+        st.warning("Ya existe")
 
     else:
-        nuevo = {
+        insertar({
             "nivel": "Proyecto",
             "project_name": nombre,
             "item_name": nombre,
@@ -124,217 +74,103 @@ if st.button("✅ Crear proyecto"):
             "start_date": datetime.today().strftime("%Y-%m-%d"),
             "end_date": datetime.today().strftime("%Y-%m-%d"),
             "progress": 0
-        }
+        })
 
-        insertar_registro(nuevo)
-
-        st.session_state["df_temp"] = cargar()
-
-        st.success("Proyecto creado ✅")
         st.rerun()
 
 # ======================
 # SELECTOR
 # ======================
-if len(proyectos) == 0:
-    st.warning("⚠️ No hay proyectos")
-    selected = None
-else:
-    selected = st.selectbox("Proyecto", proyectos, key="select_proyecto")
+selected = st.selectbox("Proyecto", proyectos) if len(proyectos) > 0 else None
 
 # ======================
-# BOTONES
+# AGREGAR TAREA
 # ======================
-col1, col2 = st.columns(2)
+if selected and st.button("➕ Tarea"):
+    insertar({
+        "nivel": "Tarea",
+        "project_name": selected,
+        "item_name": "Nueva tarea",
+        "responsible": "",
+        "start_date": datetime.today().strftime("%Y-%m-%d"),
+        "end_date": datetime.today().strftime("%Y-%m-%d"),
+        "progress": 0
+    })
+    st.rerun()
 
-with col1:
-    if selected and st.button("➕ Tarea"):
-
-        nueva_fila = {
-            "nivel": "Tarea",
-            "project_name": selected,  # 🔥 ESTA LÍNEA SOLUCIONA EL ERROR
-            "item_name": "Nueva tarea",
-            "responsible": "",
-            "start_date": datetime.today().strftime("%Y-%m-%d"),
-            "end_date": datetime.today().strftime("%Y-%m-%d"),
-            "progress": 0
-        }
-
-
-        # ✅ agregar al dataframe en memoria
-        df = pd.concat([df, pd.DataFrame([nueva_fila])], ignore_index=True)
-
-        st.session_state["df_temp"] = df  # 🔥 CLAVE
-
-        st.rerun()
-
-
-# 🗑 BORRAR PROYECTO
-with col2:
-    if selected and st.button("🗑️ Eliminar Proyecto"):
-
-        supabase.table("projects")\
-            .delete()\
-            .eq("project_name", selected)\
-            .execute()
-
-        st.success("Eliminado ✅")
-        st.rerun()
+# ======================
+# ELIMINAR PROYECTO
+# ======================
+if selected and st.button("🗑️ Eliminar Proyecto"):
+    supabase.table("projects")\
+        .delete()\
+        .eq("project_name", selected)\
+        .execute()
+    st.rerun()
 
 # ======================
 # EDITOR
 # ======================
 if selected:
-
     st.subheader("Editor")
-    df_edit = df[df["project_name"] == selected][[
-        "nivel","item_name","responsible",
-        "start_date","end_date","progress"
-    ]].copy()
 
-    # ✅ LIMPIEZA CRÍTICA
-    df_edit = df_edit.dropna(subset=["item_name"])
-
-    df_edit["nivel"] = df_edit["nivel"].fillna("Tarea").astype(str)
-    df_edit["item_name"] = df_edit["item_name"].fillna("").astype(str)
-    df_edit["responsible"] = df_edit["responsible"].fillna("").astype(str)
-
-    df_edit["start_date"] = pd.to_datetime(df_edit["start_date"], errors="coerce")
-    df_edit["end_date"] = pd.to_datetime(df_edit["end_date"], errors="coerce")
-
-    df_edit["progress"] = pd.to_numeric(df_edit["progress"], errors="coerce").fillna(0)
+    df_edit = df[df["project_name"] == selected].copy()
 
     edited = st.data_editor(
         df_edit,
         num_rows="dynamic",
-        use_container_width=True,
-        column_config={
-            "nivel": st.column_config.TextColumn("Nivel", disabled=True),
-            "start_date": st.column_config.DateColumn("Inicio"),
-            "end_date": st.column_config.DateColumn("Fin"),
-        }
+        use_container_width=True
     )
-    df_actual = st.session_state["df_temp"]
 
-    # eliminar solo el proyecto actual
-    df_actual = df_actual[df_actual["project_name"] != selected]
+    if st.button("💾 Guardar cambios"):
 
-    # agregar lo editado nuevamente
-    edited = edited.copy()
-    edited["project_name"] = selected
+        # 🔥 BORRAR TODO EL PROYECTO
+        supabase.table("projects")\
+            .delete()\
+            .eq("project_name", selected)\
+            .execute()
 
-    df_actual = pd.concat([df_actual, edited], ignore_index=True)
+        # ✅ INSERTAR PROYECTO UNA SOLA VEZ
+        insertar({
+            "nivel": "Proyecto",
+            "project_name": selected,
+            "item_name": selected,
+            "responsible": "",
+            "start_date": datetime.today().strftime("%Y-%m-%d"),
+            "end_date": datetime.today().strftime("%Y-%m-%d"),
+            "progress": 0
+        })
 
-    st.session_state["df_temp"] = df_actual
+        # ✅ INSERTAR TAREAS
+        for _, row in edited.iterrows():
 
+            item = str(row["item_name"]).strip()
 
+            if item == "" or item == selected:
+                continue
 
-if st.button("💾 Guardar cambios"):
-    # ✅ insertar UNA sola fila de proyecto
-    registro_proyecto = {
-        "nivel": "Proyecto",
-        "project_name": selected,
-        "item_name": selected,
-        "responsible": "",
-        "start_date": datetime.today().strftime("%Y-%m-%d"),
-        "end_date": datetime.today().strftime("%Y-%m-%d"),
-        "progress": 0
-    }
+            insertar({
+                "nivel": "Tarea",
+                "project_name": selected,
+                "item_name": item,
+                "responsible": str(row.get("responsible","")),
+                "start_date": pd.to_datetime(row["start_date"]).strftime("%Y-%m-%d"),
+                "end_date": pd.to_datetime(row["end_date"]).strftime("%Y-%m-%d"),
+                "progress": int(row.get("progress",0))
+            })
 
-    insertar_registro(registro_proyecto)
-
-    # ✅ borrar proyecto actual
-    supabase.table("projects")\
-        .delete()\
-        .eq("project_name", selected)\
-        .execute()
-
-    # ✅ insertar limpio con validación
-for _, row in edited.iterrows():
-
-    item = str(row.get("item_name", "")).strip()
-
-    if item == "":
-        continue
-
-    # 🔥 SALTAR PROYECTOS (YA INSERTAMOS UNO ARRIBA)
-    if item == selected:
-        continue
-
-    # ✅ todo lo demás es tarea
-    nivel = "Tarea"
-
-    try:
-        start_str = pd.to_datetime(row.get("start_date")).strftime("%Y-%m-%d")
-    except:
-        start_str = datetime.today().strftime("%Y-%m-%d")
-
-    try:
-        end_str = pd.to_datetime(row.get("end_date")).strftime("%Y-%m-%d")
-    except:
-        end_str = datetime.today().strftime("%Y-%m-%d")
-
-    try:
-        prog = int(float(row.get("progress") or 0))
-    except:
-        prog = 0
-
-    registro = {
-        "nivel": nivel,
-        "project_name": selected,
-        "item_name": item,
-        "responsible": str(row.get("responsible") or ""),
-        "start_date": start_str,
-        "end_date": end_str,
-        "progress": prog
-    }
-
-    insertar_registro(registro)
-
+        st.success("Guardado ✅")
+        st.rerun()
 
 # ======================
 # GANTT
 # ======================
 st.subheader("Timeline")
-# ======================
-# FILTRO DE FECHAS GANTT
-# ======================
-
-col_f1, col_f2 = st.columns(2)
-
-with col_f1:
-    fecha_inicio = st.date_input(
-        "📅 Ver desde",
-        value=pd.to_datetime(df["start_date"]).min() if not df.empty else datetime.today()
-    )
-
-with col_f2:
-    fecha_fin = st.date_input(
-        "📅 Ver hasta",
-        value=pd.to_datetime(df["end_date"]).max() if not df.empty else datetime.today()
-    )
 
 if not df.empty:
 
-    df["start_date"] = pd.to_datetime(df["start_date"], errors="coerce")
-    df["end_date"] = pd.to_datetime(df["end_date"], errors="coerce")
+    df["start_date"] = pd.to_datetime(df["start_date"])
+    df["end_date"] = pd.to_datetime(df["end_date"])
 
-    # ✅ FILTRO GANTT
-    df_filtrado = df[
-        (df["end_date"] >= pd.to_datetime(fecha_inicio)) &
-        (df["start_date"] <= pd.to_datetime(fecha_fin))
-    ].copy()
-
-    st.write("Filtrado:", len(df_filtrado))
-    # ✅ timeline status
-    df_filtrado["timeline_status"] = df_filtrado.apply(timeline, axis=1)
-
-
-    html = build_ms_project_gantt_html(
-        df_filtrado,
-        start_date=fecha_inicio,
-        end_date=fecha_fin
-    )
-
-
+    html = build_ms_project_gantt_html(df)
     components.html(html, height=650)
