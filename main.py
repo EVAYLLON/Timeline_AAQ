@@ -127,12 +127,12 @@ with col1:
     if selected and st.button("➕ Tarea"):
 
         nueva_tarea = {
-            "nivel": "Tarea",
-            "project_name": selected,
             "item_name": "Nueva tarea",
+            "nivel": "Tarea",
+            "project_name": selected,  # 🔥 ESTA LÍNEA ES LA CLAVE
             "responsible": "",
-            "start_date": datetime.today().strftime("%Y-%m-%d"),
-            "end_date": datetime.today().strftime("%Y-%m-%d"),
+            "start_date": datetime.today(),
+            "end_date": datetime.today(),
             "progress": 0
         }
 
@@ -185,60 +185,58 @@ if selected:
         }
     )
 
-    if st.button("💾 Guardar cambios"):
+if st.button("💾 Guardar cambios"):
 
-        # ✅ borrar proyecto actual
-        supabase.table("projects")\
-            .delete()\
-            .eq("project_name", selected)\
-            .execute()
+    # ✅ borrar proyecto actual
+    supabase.table("projects")\
+        .delete()\
+        .eq("project_name", selected)\
+        .execute()
 
-        # ✅ insertar limpio con validación
-        for _, row in edited.iterrows():
+    # ✅ insertar limpio con validación
+    for _, row in edited.iterrows():
 
-            item = str(row.get("item_name", "")).strip()
+        item = str(row.get("item_name", "")).strip()
 
-            if item == "":
-                continue
+        if item == "":
+            continue
 
-            start = pd.to_datetime(row.get("start_date"), errors="coerce")
-            end = pd.to_datetime(row.get("end_date"), errors="coerce")
+        start = pd.to_datetime(row.get("start_date"), errors="coerce")
+        end = pd.to_datetime(row.get("end_date"), errors="coerce")
 
-            # ✅ FIX CRÍTICO
-            if item == selected:
-                nivel = "Proyecto"
-            else:
-                nivel = "Tarea"
+        # ✅ FIX REAL
+        nivel = str(row.get("nivel", "Tarea")).strip()
+        if nivel not in ["Proyecto", "Tarea", "Subtarea"]:
+            nivel = "Tarea"
 
-            # ✅ convertir progreso seguro
-               
-            try:
-                start_str = pd.to_datetime(row.get("start_date")).strftime("%Y-%m-%d")
-            except:
-                start_str = datetime.today().strftime("%Y-%m-%d")
+        # ✅ fechas seguras
+        try:
+            start_str = pd.to_datetime(row.get("start_date")).strftime("%Y-%m-%d")
+        except:
+            start_str = datetime.today().strftime("%Y-%m-%d")
 
-            try:
-                end_str = pd.to_datetime(row.get("end_date")).strftime("%Y-%m-%d")
-            except:
-                end_str = datetime.today().strftime("%Y-%m-%d")
+        try:
+            end_str = pd.to_datetime(row.get("end_date")).strftime("%Y-%m-%d")
+        except:
+            end_str = datetime.today().strftime("%Y-%m-%d")
 
-            # ✅ FIX AQUÍ
-            try:
-                prog = int(float(row.get("progress") or 0))
-            except:
-                prog = 0
+        # ✅ progreso seguro
+        try:
+            prog = int(float(row.get("progress") or 0))
+        except:
+            prog = 0
 
-            registro = {
-                "nivel": nivel,
-                "project_name": selected,
-                "item_name": item,
-                "responsible": str(row.get("responsible") or ""),
-                "start_date": start_str,
-                "end_date": end_str,
-                "progress": prog
-            }
+        registro = {
+            "nivel": nivel,
+            "project_name": selected,  # ✅ ESTO ESTÁ BIEN
+            "item_name": item,
+            "responsible": str(row.get("responsible") or ""),
+            "start_date": start_str,
+            "end_date": end_str,
+            "progress": prog
+        }
 
-            insertar_registro(registro)
+        insertar_registro(registro)
 
 
 # ======================
