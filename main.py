@@ -80,8 +80,7 @@ if "df_temp" not in st.session_state:
 df = st.session_state["df_temp"]
 
 if "project_name" not in df.columns:
-    df["project_name"] = selected if selected else ""
-
+    df["project_name"] = ""
 # ======================
 # PROYECTOS
 # ======================
@@ -196,8 +195,20 @@ if selected:
             "end_date": st.column_config.DateColumn("Fin"),
         }
     )
+    df_actual = st.session_state["df_temp"]
 
-st.session_state["df_temp"] = edited
+    # eliminar solo el proyecto actual
+    df_actual = df_actual[df_actual["project_name"] != selected]
+
+    # agregar lo editado nuevamente
+    edited = edited.copy()
+    edited["project_name"] = selected
+
+    df_actual = pd.concat([df_actual, edited], ignore_index=True)
+
+    st.session_state["df_temp"] = df_actual
+
+
 
 if st.button("💾 Guardar cambios"):
 
