@@ -239,21 +239,22 @@ st.subheader("Timeline")
 
 if not df.empty:
 
+    # ✅ asegurar fechas
     df["start_date"] = pd.to_datetime(df["start_date"], errors="coerce")
     df["end_date"] = pd.to_datetime(df["end_date"], errors="coerce")
 
     # ======================
+    # SESSION STATE ✅
+    # ======================
+    if "fecha_inicio" not in st.session_state:
+        st.session_state["fecha_inicio"] = df["start_date"].min()
+
+    if "fecha_fin" not in st.session_state:
+        st.session_state["fecha_fin"] = df["end_date"].max()
+
+    # ======================
     # SELECTOR DE FECHAS ✅
     # ======================
-
-if "fecha_inicio" not in st.session_state:
-    st.session_state["fecha_inicio"] = df["start_date"].min()
-
-if "fecha_fin" not in st.session_state:
-    st.session_state["fecha_fin"] = df["end_date"].max()
-
-
-
     col_f1, col_f2 = st.columns(2)
 
     with col_f1:
@@ -262,21 +263,27 @@ if "fecha_fin" not in st.session_state:
             value=st.session_state["fecha_inicio"]
         )
 
+    with col_f2:
         fecha_fin = st.date_input(
             "📅 Ver hasta",
             value=st.session_state["fecha_fin"]
         )
 
-        # ✅ Guardar en estado
-        st.session_state["fecha_inicio"] = fecha_inicio
-        st.session_state["fecha_fin"] = fecha_fin
+    # ✅ guardar estado
+    st.session_state["fecha_inicio"] = fecha_inicio
+    st.session_state["fecha_fin"] = fecha_fin
 
-    # ✅ FILTRO POR RANGO
+    # ======================
+    # NO FILTRAR FILAS ✅
+    # ======================
     df_filtrado = df.copy()
-    # ✅ timeline status
+
+    # ✅ status
     df_filtrado["timeline_status"] = df_filtrado.apply(timeline, axis=1)
 
-    # ✅ GANTT
+    # ======================
+    # GANTT ✅
+    # ======================
     html = build_ms_project_gantt_html(
         df_filtrado,
         start_date=fecha_inicio,
