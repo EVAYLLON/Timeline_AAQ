@@ -164,6 +164,10 @@ if selected:
 
     df_edit = df[df["project_name"] == selected].copy()
 
+# ✅ asegurar columna de link
+    if "document_url" not in df_edit.columns:
+        df_edit["document_url"] = ""
+
     # ✅ FORMATO FECHAS PARA CALENDARIO
     df_edit["start_date"] = pd.to_datetime(df_edit["start_date"], errors="coerce")
     df_edit["end_date"] = pd.to_datetime(df_edit["end_date"], errors="coerce")
@@ -171,7 +175,7 @@ if selected:
     # ✅ SOLO COLUMNAS LIMPIAS
     df_edit = df_edit[[
         "nivel","item_name","responsible",
-        "start_date","end_date","progress"
+        "start_date","end_date","progress","document_url"
     ]]
 
     edited = st.data_editor(
@@ -182,7 +186,8 @@ if selected:
             "nivel": st.column_config.TextColumn("Nivel", disabled=True),
             "start_date": st.column_config.DateColumn("Inicio"),
             "end_date": st.column_config.DateColumn("Fin"),
-            "progress": st.column_config.NumberColumn("Avance")
+            "progress": st.column_config.NumberColumn("Avance"),
+            "document_url": st.column_config.LinkColumn("Documento")
         }
     )
 
@@ -207,7 +212,8 @@ if selected:
             "responsible": str(row_proyecto.get("responsible","")),
             "start_date": pd.to_datetime(row_proyecto["start_date"]).strftime("%Y-%m-%d"),
             "end_date": pd.to_datetime(row_proyecto["end_date"]).strftime("%Y-%m-%d"),
-            "progress": int(row_proyecto.get("progress",0))
+            "progress": int(row_proyecto.get("progress",0)),
+            "document_url": str(row_proyecto.get("document_url","")),
         })
 
 
