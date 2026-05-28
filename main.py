@@ -239,8 +239,37 @@ if not df.empty:
     df["start_date"] = pd.to_datetime(df["start_date"], errors="coerce")
     df["end_date"] = pd.to_datetime(df["end_date"], errors="coerce")
 
-    df["timeline_status"] = df.apply(timeline, axis=1)
+    # ======================
+    # SELECTOR DE FECHAS ✅
+    # ======================
+    col_f1, col_f2 = st.columns(2)
 
-    html = build_ms_project_gantt_html(df)
+    with col_f1:
+        fecha_inicio = st.date_input(
+            "📅 Ver desde",
+            value=df["start_date"].min()
+        )
+
+    with col_f2:
+        fecha_fin = st.date_input(
+            "📅 Ver hasta",
+            value=df["end_date"].max()
+        )
+
+    # ✅ FILTRO POR RANGO
+    df_filtrado = df[
+        (df["end_date"] >= pd.to_datetime(fecha_inicio)) &
+        (df["start_date"] <= pd.to_datetime(fecha_fin))
+    ].copy()
+
+    # ✅ timeline status
+    df_filtrado["timeline_status"] = df_filtrado.apply(timeline, axis=1)
+
+    # ✅ GANTT
+    html = build_ms_project_gantt_html(
+        df_filtrado,
+        start_date=fecha_inicio,
+        end_date=fecha_fin
+    )
 
     components.html(html, height=650)
