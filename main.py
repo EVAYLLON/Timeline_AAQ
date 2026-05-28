@@ -77,7 +77,7 @@ st.title("Project Tracker ✅")
 if "df_temp" not in st.session_state:
     st.session_state["df_temp"] = cargar()
 
-df = st.session_state["df_temp"]
+df = st.session_state.get("df_temp", cargar())
 df = df.copy()
 df["project_name"] = df["project_name"].astype(str).str.strip()
 
@@ -113,6 +113,10 @@ if st.button("✅ Crear proyecto"):
         }
 
         insertar_registro(nuevo)
+
+        # 🔥 FORZAR ACTUALIZACIÓN DESDE SUPABASE
+        st.session_state["df_temp"] = cargar()
+
         st.success("Proyecto creado ✅")
         st.rerun()
 
