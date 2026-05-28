@@ -74,7 +74,10 @@ def timeline(row):
 st.set_page_config(layout="wide")
 st.title("Project Tracker ✅")
 
-df = cargar()
+if "df_temp" not in st.session_state:
+    st.session_state["df_temp"] = cargar()
+
+df = st.session_state["df_temp"]
 
 # ======================
 # PROYECTOS
@@ -122,22 +125,25 @@ else:
 # ======================
 col1, col2 = st.columns(2)
 
-# ➕ TAREA
 with col1:
     if selected and st.button("➕ Tarea"):
 
-        nueva_tarea = {
-            "item_name": "Nueva tarea",
+        nueva_fila = {
             "nivel": "Tarea",
-            "project_name": selected,  # 🔥 ESTA LÍNEA ES LA CLAVE
+            "item_name": "Nueva tarea",
             "responsible": "",
-            "start_date": datetime.today(),
-            "end_date": datetime.today(),
+            "start_date": datetime.today().strftime("%Y-%m-%d"),
+            "end_date": datetime.today().strftime("%Y-%m-%d"),
             "progress": 0
         }
 
-        insertar_registro(nueva_tarea)
+        # ✅ agregar al dataframe en memoria
+        df = pd.concat([df, pd.DataFrame([nueva_fila])], ignore_index=True)
+
+        st.session_state["df_temp"] = df  # 🔥 CLAVE
+
         st.rerun()
+
 
 # 🗑 BORRAR PROYECTO
 with col2:
@@ -184,6 +190,8 @@ if selected:
             "end_date": st.column_config.DateColumn("Fin"),
         }
     )
+
+st.session_state["df_temp"] = edited
 
 if st.button("💾 Guardar cambios"):
 
