@@ -78,6 +78,8 @@ if "df_temp" not in st.session_state:
     st.session_state["df_temp"] = cargar()
 
 df = st.session_state["df_temp"]
+df = df.copy()
+df["project_name"] = df["project_name"].astype(str).str.strip()
 
 if "project_name" not in df.columns:
     df["project_name"] = ""
