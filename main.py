@@ -79,9 +79,13 @@ if "df_temp" not in st.session_state:
 
 df = st.session_state["df_temp"]
 
+if "project_name" not in df.columns:
+    df["project_name"] = selected if selected else ""
+
 # ======================
 # PROYECTOS
 # ======================
+df["project_name"] = df.get("project_name", "")
 proyectos = df[df["nivel"] == "Proyecto"]["project_name"].dropna().unique()
 
 # ======================
@@ -130,12 +134,14 @@ with col1:
 
         nueva_fila = {
             "nivel": "Tarea",
+            "project_name": selected,  # 🔥 ESTA LÍNEA SOLUCIONA EL ERROR
             "item_name": "Nueva tarea",
             "responsible": "",
             "start_date": datetime.today().strftime("%Y-%m-%d"),
             "end_date": datetime.today().strftime("%Y-%m-%d"),
             "progress": 0
         }
+
 
         # ✅ agregar al dataframe en memoria
         df = pd.concat([df, pd.DataFrame([nueva_fila])], ignore_index=True)
