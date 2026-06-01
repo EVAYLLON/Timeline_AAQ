@@ -1,3 +1,4 @@
+
 """
 main.py  —  Project Tracker con Supabase + Gantt
 
@@ -344,7 +345,8 @@ with col_mgmt:
     if df_proj.empty:
         st.caption("Este proyecto no tiene tareas aún.")
     else:
-        df_edit = df_proj[[
+        # Excluir la fila del Proyecto del editor (solo tareas y subtareas)
+        df_edit = df_proj[df_proj["nivel"] != "Proyecto"][[
             "id", "nivel", "item_name", "responsible",
             "start_date", "end_date", "progress", "status", "document_url"
         ]].copy()
@@ -352,47 +354,87 @@ with col_mgmt:
         df_edit["start_date"] = pd.to_datetime(df_edit["start_date"], errors="coerce")
         df_edit["end_date"]   = pd.to_datetime(df_edit["end_date"],   errors="coerce")
 
-        edited = st.data_editor(
-            df_edit,
-            num_rows="fixed",
-            use_container_width=True,
-            hide_index=True,
-            column_config={
-                "id":           st.column_config.NumberColumn("ID",      disabled=True, width="small"),
-                "nivel":        st.column_config.TextColumn("Nivel",     disabled=True, width="small"),
-                "item_name":    st.column_config.TextColumn("Nombre"),
-                "responsible":  st.column_config.TextColumn("Responsable"),
-                "start_date":   st.column_config.DateColumn("Inicio"),
-                "end_date":     st.column_config.DateColumn("Fin"),
-                "progress":     st.column_config.NumberColumn("Avance %", min_value=0, max_value=100, step=5),
-                "status":       st.column_config.SelectboxColumn("Estado", options=STATUS_OPTIONS),
-                "document_url": st.column_config.LinkColumn("Documento"),
-            },
-            key="editor_tareas",
-        )
+        if df_edit.empty:
+            st.caption("Agrega tareas usando el formulario de arriba.")
+        else:
+            edited = st.data_editor(
+                df_edit,
+                num_rows="fixed",
+                use_container_width=True,
+                hide_index=True,
+                column_config={
+                    "id":           st.column_config.NumberColumn("ID",       disabled=True, width="small"),
+                    "nivel":        st.column_config.TextColumn("Nivel",      disabled=True, width="small"),
+                    "item_name":    st.column_config.TextColumn("Nombre"),
+                    "responsible":  st.column_config.TextColumn("Responsable"),
+                    "start_date":   st.column_config.DateColumn("Inicio"),
+                    "end_date":     st.column_config.DateColumn("Fin"),
+                    "progress":     st.column_config.NumberColumn("Avance %", min_value=0, max_value=100, step=5),
+                    "status":       st.column_config.SelectboxColumn("Estado", options=STATUS_OPTIONS),
+                    "document_url": st.column_config.LinkColumn("Documento"),
+                },
+                key="editor_tareas",
+            )
 
-        if st.button("💾 Guardar cambios", use_container_width=True, type="primary"):
-            errores = 0
-            for _, row in edited.iterrows():
-                try:
-                    actualizar_fila(int(row["id"]), {
-                        "item_name":    str(row["item_name"]).strip(),
-                        "responsible":  str(row.get("responsible", "")).strip(),
-                        "start_date":   pd.to_datetime(row["start_date"]).strftime("%Y-%m-%d"),
-                        "end_date":     pd.to_datetime(row["end_date"]).strftime("%Y-%m-%d"),
-                        "progress":     int(row.get("progress", 0)),
-                        "status":       str(row.get("status", "No iniciado")),
-                        "document_url": str(row.get("document_url", "")).strip(),
-                    })
-                except Exception as exc:
-                    st.warning(f"Error fila {row['id']}: {exc}")
-                    errores += 1
+            if st.button("💾 Guardar cambios", use_container_width=True, type="primary"):
+                errores = 0
+                for _, row in edited.iterrows():
+                    try:
+                        actualizar_fila(int(row["id"]), {
+                            "item_name":    str(row["item_name"]).strip(),
+                            "responsible":  str(row.get("responsible", "")).strip(),
+                            "start_date":   pd.to_datetime(row["start_date"]).strftime("%Y-%m-%d"),
+                            "end_date":     pd.to_datetime(row["end_date"]).strftime("%Y-%m-%d"),
+                            "progress":     int(row.get("progress", 0)),
+                            "status":       str(row.get("status", "No iniciado")),
+                            "document_url": str(row.get("document_url", "")).strip(),
+                        })
+                    except Exception as exc:
+                        st.warning(f"Error fila {row['id']}: {exc}")
+                        errores += 1
 
-            if errores == 0:
-                st.success("Cambios guardados ✅")
-            else:
-                st.warning(f"Guardado con {errores} error(es).")
-            st.rerun()
+                if errores == 0:
+                    st.success("Cambios guardados ✅")
+                else:
+                    st.warning(f"Guardado con {errores} error(es).")
+                st.rerun()
+
+        # ── Eliminar tarea o subtarea ──────────────
+        st.markdown("<div class='pt-divider'></div>", unsafe_allow_html=True)
+        st.markdown("### 🗑️ Eliminar tarea / subtarea")
+
+        # Solo tareas y subtareas (no el proyecto)
+        eliminables = df_proj[df_proj["nivel"] != "Proyecto"][["id", "nivel", "item_name"]].copy()
+
+        if eliminables.empty:
+            st.caption("No hay tareas para eliminar.")
+        else:
+            # Construir etiquetas descriptivas: [Tarea] Nombre (ID: 123)
+            eliminables["_label"] = eliminables.apply(
+                lambda r: f"[{r['nivel']}] {r['item_name']}  (ID: {int(r['id'])})", axis=1
+            )
+            opciones = eliminables["_label"].tolist()
+            ids_map  = dict(zip(eliminables["_label"], eliminables["id"]))
+
+            sel_eliminar = st.selectbox("Selecciona el elemento a eliminar", opciones, key="sel_eliminar")
+
+            col_btn, col_warn = st.columns([1, 2])
+            with col_btn:
+                if st.button("🗑️ Eliminar", type="secondary", use_container_width=True):
+                    fila_id   = int(ids_map[sel_eliminar])
+                    fila_nivel = eliminables[eliminables["id"] == fila_id]["nivel"].values[0]
+
+                    if fila_nivel == "Tarea":
+                        # Eliminar la tarea Y todas sus subtareas (parent_id == fila_id)
+                        get_supabase().table(TABLE).delete().eq("parent_id", fila_id).execute()
+
+                    # Eliminar la fila en sí
+                    get_supabase().table(TABLE).delete().eq("id", fila_id).execute()
+                    st.success(f"Eliminado: {sel_eliminar}")
+                    st.rerun()
+            with col_warn:
+                if eliminables[eliminables["id"] == ids_map.get(sel_eliminar, -1)]["nivel"].values[0] == "Tarea":
+                    st.caption("⚠️ Al eliminar una Tarea se borran también todas sus Subtareas.")
 
     st.markdown("<div class='pt-divider'></div>", unsafe_allow_html=True)
 
