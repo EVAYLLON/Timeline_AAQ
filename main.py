@@ -504,10 +504,11 @@ with col_gantt:
         df_g["timeline_status"] = df_g.apply(calcular_timeline_status, axis=1)
         html_inner = build_ms_project_gantt_html(df_g, start_date=f_inicio, end_date=f_fin)
 
-        # ── Botones de acción ────────────────────
-        btn1, btn2, btn3 = st.columns([1, 1, 2])
+        # ── Gantt embebido ───────────────────────
+        altura = max(200, min(len(df_g) * 36 + 90, 620))
+        components.html(html_inner, height=altura, scrolling=True)
 
-        # PANTALLA COMPLETA: abre el gantt en una nueva pestaña del navegador
+        # ── Exportar HTML (debajo del gantt) ─────
         html_standalone = f"""<!DOCTYPE html>
 <html><head>
 <meta charset="utf-8">
@@ -531,38 +532,19 @@ with col_gantt:
   <h2>📊 Project Tracker — Gantt</h2>
   <span>Desde {f_inicio} hasta {f_fin} &nbsp;|&nbsp;
         <a href="javascript:window.print()" style="color:#2563eb;text-decoration:none;font-weight:600;">🖨 Imprimir / Guardar PDF</a>
-        &nbsp;|&nbsp;
-        <a href="javascript:window.close()" style="color:#64748b;">✕ Cerrar</a>
   </span>
 </div>
 {html_inner}
 </body></html>"""
 
-        # Botón Pantalla Completa — abre nueva pestaña vía data URI
-        b64_html = __import__("base64").b64encode(html_standalone.encode("utf-8")).decode()
-        open_js = f"""
-<a href="data:text/html;base64,{b64_html}" target="_blank"
-   style="display:inline-flex;align-items:center;gap:6px;
-          background:#1e293b;color:white;border-radius:7px;
-          padding:7px 14px;font-size:12.5px;font-weight:600;
-          text-decoration:none;font-family:'DM Sans',sans-serif;
-          box-shadow:0 1px 4px rgba(0,0,0,0.15);">
-  ⛶ Pantalla completa
-</a>"""
-        btn1.markdown(open_js, unsafe_allow_html=True)
-
-        # Botón Exportar HTML
-        btn2.download_button(
-            label="⬇ Exportar HTML",
+        st.download_button(
+            label="⬇ Exportar Gantt como HTML",
             data=html_standalone.encode("utf-8"),
             file_name=f"gantt_{key_suffix}_{f_inicio}_{f_fin}.html",
             mime="text/html",
             use_container_width=True,
+            key=f"dl_{key_suffix}",
         )
-
-        # ── Gantt embebido (tamaño normal) ───────
-        altura = max(200, min(len(df_g) * 36 + 90, 620))
-        components.html(html_inner, height=altura, scrolling=True)
 
     with tab_uno:
         _render_gantt(df_proj, "uno")
