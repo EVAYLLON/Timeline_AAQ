@@ -496,15 +496,73 @@ with col_gantt:
         min_d = df_g["start_date"].min()
         max_d = df_g["end_date"].max()
 
-        cf1, cf2, _ = st.columns([1, 1, 2])
+        # ── Controles ────────────────────────────
+        cf1, cf2 = st.columns([1, 1])
         f_inicio = cf1.date_input("Desde", value=min_d, key=f"gi_{key_suffix}")
         f_fin    = cf2.date_input("Hasta", value=max_d, key=f"gf_{key_suffix}")
 
         df_g["timeline_status"] = df_g.apply(calcular_timeline_status, axis=1)
+        html_inner = build_ms_project_gantt_html(df_g, start_date=f_inicio, end_date=f_fin)
 
-        html = build_ms_project_gantt_html(df_g, start_date=f_inicio, end_date=f_fin)
-        altura = max(200, min(len(df_g) * 36 + 90, 850))
-        components.html(html, height=altura, scrolling=True)
+        # ── Botones de acción ────────────────────
+        btn1, btn2, btn3 = st.columns([1, 1, 2])
+
+        # PANTALLA COMPLETA: abre el gantt en una nueva pestaña del navegador
+        html_standalone = f"""<!DOCTYPE html>
+<html><head>
+<meta charset="utf-8">
+<title>Gantt — Project Tracker</title>
+<style>
+  body {{ margin: 0; padding: 16px 20px; background: #f8f9fb;
+          font-family: 'DM Sans', sans-serif; }}
+  .top-bar {{
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 14px;
+  }}
+  .top-bar h2 {{ margin:0; font-size:16px; color:#1e293b; font-weight:700; }}
+  .top-bar span {{ font-size:12px; color:#64748b; }}
+  @media print {{
+    .top-bar {{ display: none; }}
+    body {{ padding: 0; }}
+  }}
+</style>
+</head><body>
+<div class="top-bar">
+  <h2>📊 Project Tracker — Gantt</h2>
+  <span>Desde {f_inicio} hasta {f_fin} &nbsp;|&nbsp;
+        <a href="javascript:window.print()" style="color:#2563eb;text-decoration:none;font-weight:600;">🖨 Imprimir / Guardar PDF</a>
+        &nbsp;|&nbsp;
+        <a href="javascript:window.close()" style="color:#64748b;">✕ Cerrar</a>
+  </span>
+</div>
+{html_inner}
+</body></html>"""
+
+        # Botón Pantalla Completa — abre nueva pestaña vía data URI
+        b64_html = __import__("base64").b64encode(html_standalone.encode("utf-8")).decode()
+        open_js = f"""
+<a href="data:text/html;base64,{b64_html}" target="_blank"
+   style="display:inline-flex;align-items:center;gap:6px;
+          background:#1e293b;color:white;border-radius:7px;
+          padding:7px 14px;font-size:12.5px;font-weight:600;
+          text-decoration:none;font-family:'DM Sans',sans-serif;
+          box-shadow:0 1px 4px rgba(0,0,0,0.15);">
+  ⛶ Pantalla completa
+</a>"""
+        btn1.markdown(open_js, unsafe_allow_html=True)
+
+        # Botón Exportar HTML
+        btn2.download_button(
+            label="⬇ Exportar HTML",
+            data=html_standalone.encode("utf-8"),
+            file_name=f"gantt_{key_suffix}_{f_inicio}_{f_fin}.html",
+            mime="text/html",
+            use_container_width=True,
+        )
+
+        # ── Gantt embebido (tamaño normal) ───────
+        altura = max(200, min(len(df_g) * 36 + 90, 620))
+        components.html(html_inner, height=altura, scrolling=True)
 
     with tab_uno:
         _render_gantt(df_proj, "uno")
