@@ -531,6 +531,9 @@ with col_gantt:
         f_fin    = cf2.date_input("Hasta", value=max_d, key=f"gf_{key_suffix}")
 
         df_g["timeline_status"] = df_g.apply(calcular_timeline_status, axis=1)
+
+
+        st.write(df_g[["nivel","id","project_id","item_name"]].to_dict("records"))
         html_inner = build_ms_project_gantt_html(df_g, start_date=f_inicio, end_date=f_fin)
 
         # ── Gantt embebido ───────────────────────
