@@ -80,21 +80,50 @@ def cargar_datos() -> pd.DataFrame:
         ("parent_id",    None),
         ("project_id",   ""),
         ("progress",     0),
+        ("sort_order",   0),
     ]:
         if col not in df.columns:
             df[col] = default
 
-    # Tipos
+    # Tipos numéricos
+    df["id"]        = pd.to_numeric(df["id"],       errors="coerce")
+    df["item_id"]   = pd.to_numeric(df["item_id"],  errors="coerce")
+    df["parent_id"] = pd.to_numeric(df["parent_id"],errors="coerce")
+    df["progress"]  = pd.to_numeric(df["progress"], errors="coerce").fillna(0).clip(0, 100).astype(int)
+    df["sort_order"]= pd.to_numeric(df["sort_order"],errors="coerce").fillna(0).astype(int)
+
+    # Fechas
     df["start_date"] = pd.to_datetime(df["start_date"], errors="coerce")
     df["end_date"]   = pd.to_datetime(df["end_date"],   errors="coerce")
-    df["progress"]   = pd.to_numeric(df["progress"], errors="coerce").fillna(0).clip(0, 100).astype(int)
-    df["id"]         = pd.to_numeric(df["id"],       errors="coerce")
-    df["item_id"]    = pd.to_numeric(df["item_id"],  errors="coerce")
-    df["parent_id"]  = pd.to_numeric(df["parent_id"],errors="coerce")  # NaN para proyectos
 
-    for col in ["nivel", "project_name", "item_name", "responsible", "status", "document_url", "project_id"]:
+    # Strings limpios
+    for col in ["nivel", "project_name", "item_name", "responsible", "status", "document_url"]:
         if col in df.columns:
             df[col] = df[col].fillna("").astype(str).str.strip()
+
+    # project_id: clave de aislamiento — CRÍTICO
+    # Para proyectos: project_id debe ser igual a su propio id (como string)
+    # Si está vacío o es NULL, lo reconstruimos desde id para proyectos
+    df["project_id"] = df["project_id"].fillna("").astype(str).str.strip()
+
+    mask_proj_sin_pid = (df["nivel"] == "Proyecto") & (df["project_id"] == "")
+    df.loc[mask_proj_sin_pid, "project_id"] = df.loc[mask_proj_sin_pid, "id"].astype(str)
+
+    # Para tareas/subtareas sin project_id, intentar recuperar por project_name
+    pid_por_nombre = (
+        df[df["nivel"] == "Proyecto"]
+        .drop_duplicates("project_name")
+        .set_index("project_name")["id"]
+        .apply(lambda x: str(int(x)))
+        .to_dict()
+    )
+    mask_tarea_sin_pid = (df["nivel"] != "Proyecto") & (df["project_id"] == "")
+    df.loc[mask_tarea_sin_pid, "project_id"] = (
+        df.loc[mask_tarea_sin_pid, "project_name"].map(pid_por_nombre).fillna("")
+    )
+
+    # Eliminar filas que siguen sin project_id válido (huérfanas reales)
+    df = df[df["project_id"] != ""].reset_index(drop=True)
 
     return df
 
