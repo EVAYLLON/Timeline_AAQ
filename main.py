@@ -532,8 +532,38 @@ with col_gantt:
 
         df_g["timeline_status"] = df_g.apply(calcular_timeline_status, axis=1)
 
+        # ── Ordenar aquí, antes de pasar al gantt ──────────────────────────
+        # Garantiza Proyecto → sus tareas, sin que gantt.py reordene nada.
+        df_g["_sort_order_tmp"] = pd.to_numeric(df_g.get("sort_order", 0), errors="coerce").fillna(999)
 
-        st.write(df_g[["nivel","id","project_id","item_name"]].to_dict("records"))
+        proyectos_ord = (
+            df_g[df_g["nivel"] == "Proyecto"][["project_id", "start_date"]]
+            .drop_duplicates("project_id")
+            .sort_values(["start_date", "project_id"])
+            .reset_index(drop=True)
+        )
+        proyectos_ord["_grank"] = range(len(proyectos_ord))
+        rank_map = dict(zip(proyectos_ord["project_id"], proyectos_ord["_grank"]))
+
+        df_g["_grank"] = df_g["project_id"].map(rank_map)
+        df_g["_grank"] = pd.to_numeric(df_g["_grank"], errors="coerce").fillna(99999).astype(int)
+
+        proyectos_f = df_g[df_g["nivel"] == "Proyecto"].copy().sort_values("_grank", kind="stable")
+        resto_f     = df_g[df_g["nivel"] != "Proyecto"].copy().sort_values(
+            ["_grank", "_sort_order_tmp", "start_date"], kind="stable"
+        )
+
+        idx_ord = []
+        for _, pr in proyectos_f.iterrows():
+            idx_ord.append(pr.name)
+            idx_ord.extend(resto_f[resto_f["_grank"] == int(pr["_grank"])].index.tolist())
+        for i in resto_f[resto_f["_grank"] == 99999].index:
+            if i not in idx_ord:
+                idx_ord.append(i)
+
+        df_g = df_g.loc[idx_ord].reset_index(drop=True)
+        # ───────────────────────────────────────────────────────────────────
+
         html_inner = build_ms_project_gantt_html(df_g, start_date=f_inicio, end_date=f_fin)
 
         # ── Gantt embebido ───────────────────────
