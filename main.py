@@ -86,10 +86,10 @@ def cargar_datos() -> pd.DataFrame:
             df[col] = default
 
     # Tipos numéricos
-    df["id"]        = pd.to_numeric(df["id"],       errors="coerce")
-    df["item_id"]   = pd.to_numeric(df["item_id"],  errors="coerce")
-    df["parent_id"] = pd.to_numeric(df["parent_id"],errors="coerce")
-    df["progress"]  = pd.to_numeric(df["progress"], errors="coerce").fillna(0).clip(0, 100).astype(int)
+    df["id"]        = pd.to_numeric(df["id"],        errors="coerce").astype("Int64")
+    df["item_id"]   = pd.to_numeric(df["item_id"],   errors="coerce").astype("Int64")
+    df["parent_id"] = pd.to_numeric(df["parent_id"], errors="coerce").astype("Int64")
+    df["progress"]  = pd.to_numeric(df["progress"],  errors="coerce").fillna(0).clip(0, 100).astype(int)
     df["sort_order"]= pd.to_numeric(df["sort_order"],errors="coerce").fillna(0).astype(int)
 
     # Fechas
@@ -107,14 +107,14 @@ def cargar_datos() -> pd.DataFrame:
     df["project_id"] = df["project_id"].fillna("").astype(str).str.strip()
 
     mask_proj_sin_pid = (df["nivel"] == "Proyecto") & (df["project_id"] == "")
-    df.loc[mask_proj_sin_pid, "project_id"] = df.loc[mask_proj_sin_pid, "id"].astype(str)
+    df.loc[mask_proj_sin_pid, "project_id"] = df.loc[mask_proj_sin_pid, "id"].astype("Int64").astype(str)
 
     # Para tareas/subtareas sin project_id, intentar recuperar por project_name
     pid_por_nombre = (
         df[df["nivel"] == "Proyecto"]
         .drop_duplicates("project_name")
         .set_index("project_name")["id"]
-        .apply(lambda x: str(int(x)))
+        .apply(lambda x: str(int(x)) if pd.notna(x) else "")
         .to_dict()
     )
     mask_tarea_sin_pid = (df["nivel"] != "Proyecto") & (df["project_id"] == "")
