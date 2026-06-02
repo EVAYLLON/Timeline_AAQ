@@ -1,4 +1,3 @@
-
 """
 main.py  —  Project Tracker con Supabase + Gantt
 
@@ -44,7 +43,7 @@ TABLE = "projects"
 _COLS_SELECT = (
     "id,nivel,project_id,project_name,"
     "item_id,item_name,parent_id,"
-    "responsible,start_date,end_date,progress,status,document_url"
+    "responsible,start_date,end_date,progress,status,document_url,sort_order"
 )
 
 STATUS_OPTIONS = ["No iniciado", "En curso", "Completado", "Cancelado", "En riesgo"]
@@ -354,15 +353,25 @@ with col_mgmt:
         df_edit["start_date"] = pd.to_datetime(df_edit["start_date"], errors="coerce")
         df_edit["end_date"]   = pd.to_datetime(df_edit["end_date"],   errors="coerce")
 
+        # Columna de orden: si ya existe en Supabase la usamos, si no asignamos 0,1,2...
+        if "sort_order" in df_proj.columns:
+            df_edit["orden"] = df_proj[df_proj["nivel"] != "Proyecto"]["sort_order"].values
+        else:
+            df_edit["orden"] = range(len(df_edit))
+
+        df_edit = df_edit.sort_values("orden").reset_index(drop=True)
+
         if df_edit.empty:
             st.caption("Agrega tareas usando el formulario de arriba.")
         else:
+            st.caption("💡 Cambia el número en **Orden** para reordenar las tareas en el Gantt. Luego guarda.")
             edited = st.data_editor(
                 df_edit,
                 num_rows="fixed",
                 use_container_width=True,
                 hide_index=True,
                 column_config={
+                    "orden":        st.column_config.NumberColumn("Orden", min_value=0, max_value=999, step=1, width="small"),
                     "id":           st.column_config.NumberColumn("ID",       disabled=True, width="small"),
                     "nivel":        st.column_config.TextColumn("Nivel",      disabled=True, width="small"),
                     "item_name":    st.column_config.TextColumn("Nombre"),
@@ -373,6 +382,7 @@ with col_mgmt:
                     "status":       st.column_config.SelectboxColumn("Estado", options=STATUS_OPTIONS),
                     "document_url": st.column_config.LinkColumn("Documento"),
                 },
+                column_order=["orden","id","nivel","item_name","responsible","start_date","end_date","progress","status","document_url"],
                 key="editor_tareas",
             )
 
@@ -388,6 +398,7 @@ with col_mgmt:
                             "progress":     int(row.get("progress", 0)),
                             "status":       str(row.get("status", "No iniciado")),
                             "document_url": str(row.get("document_url", "")).strip(),
+                            "sort_order":   int(row.get("orden", 0)),
                         })
                     except Exception as exc:
                         st.warning(f"Error fila {row['id']}: {exc}")
@@ -440,18 +451,26 @@ with col_mgmt:
 
     # ── Eliminar proyecto ─────────────────────
     with st.expander("⚠️ Zona peligrosa"):
-        st.warning(
-            f"Eliminar **{selected_project_name}** borrará también "
-            "todas sus tareas y subtareas. No se puede deshacer."
-        )
-        confirmar = st.text_input("Escribe el nombre del proyecto para confirmar:", key="confirm_del")
-        if st.button("🗑️ Eliminar proyecto", type="secondary", use_container_width=True):
-            if confirmar.strip() == selected_project_name:
-                eliminar_por_project_id(selected_project_id)
-                st.success("Proyecto eliminado.")
-                st.rerun()
-            else:
-                st.error("El nombre no coincide. Cancelado.")
+        st.warning("Esta acción eliminará el proyecto seleccionado y **todas** sus tareas y subtareas. No se puede deshacer.")
+
+        # Selector con todos los proyectos existentes
+        proj_opts  = ["— Selecciona un proyecto —"] + proyecto_names
+        proj_del_i = st.selectbox("Proyecto a eliminar", range(len(proj_opts)),
+                                   format_func=lambda i: proj_opts[i], key="sel_del_proj")
+
+        if proj_del_i > 0:
+            nombre_a_borrar = proj_opts[proj_del_i]
+            pid_a_borrar    = proyecto_ids[proj_del_i - 1]
+            st.error(f"Vas a eliminar: **{nombre_a_borrar}**")
+
+            # Doble confirmación: checkbox
+            confirmar_check = st.checkbox(f'Confirmo que quiero eliminar "{nombre_a_borrar}" permanentemente', key="chk_del")
+
+            if confirmar_check:
+                if st.button("🗑️ Eliminar proyecto ahora", type="secondary", use_container_width=True):
+                    eliminar_por_project_id(pid_a_borrar)
+                    st.success(f"Proyecto **{nombre_a_borrar}** eliminado.")
+                    st.rerun()
 
 
 # ══════════════════════════════════════════════
