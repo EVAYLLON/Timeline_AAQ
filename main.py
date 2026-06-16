@@ -176,21 +176,39 @@ st.set_page_config(
     initial_sidebar_state="collapsed",
 )
 
+# ── Detectar tema (claro / oscuro) de forma robusta ──
+def _detectar_tema() -> str:
+    try:
+        base = st.context.theme.type  # Streamlit reciente: "light" | "dark"
+        if base in ("light", "dark"):
+            return base
+    except Exception:
+        pass
+    try:
+        base = st.get_option("theme.base")
+        if base in ("light", "dark"):
+            return base
+    except Exception:
+        pass
+    return "light"
+
+APP_THEME = _detectar_tema()
+
 st.markdown("""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&display=swap');
 html, body, [class*="css"] { font-family: 'DM Sans', sans-serif !important; }
 .block-container { padding-top: 1.2rem !important; padding-bottom: 2rem !important; max-width: 100% !important; }
-h1 { font-size: 1.5rem !important; font-weight: 700 !important; letter-spacing: -0.03em; color: #0f172a; }
-h2 { font-size: 1.1rem !important; font-weight: 600 !important; color: #1e293b; }
-h3 { font-size: 1rem !important; font-weight: 600 !important; color: #334155; }
-h4 { font-size: 0.9rem !important; font-weight: 600 !important; color: #475569; }
+h1 { font-size: 1.5rem !important; font-weight: 700 !important; letter-spacing: -0.03em; }
+h2 { font-size: 1.1rem !important; font-weight: 600 !important; }
+h3 { font-size: 1rem !important; font-weight: 600 !important; }
+h4 { font-size: 0.9rem !important; font-weight: 600 !important; }
 .pt-badge {
   display: inline-block; font-size: 11px; font-weight: 600;
   padding: 2px 9px; border-radius: 99px;
   background: #e0f2fe; color: #0369a1;
 }
-.pt-divider { height: 1px; background: #eef2f7; margin: 14px 0; }
+.pt-divider { height: 1px; background: rgba(148,163,184,0.22); margin: 14px 0; }
 
 section[data-testid="stSidebar"] { display: none; }
 
@@ -203,13 +221,7 @@ section[data-testid="stSidebar"] { display: none; }
 }
 .stButton > button:hover, .stDownloadButton > button:hover {
   transform: translateY(-1px);
-  box-shadow: 0 3px 10px rgba(0,0,0,0.08) !important;
-}
-/* Secondary buttons softer */
-.stButton > button[kind="secondary"] {
-  background: #f8fafc !important;
-  border: 1px solid #e2e8f0 !important;
-  color: #475569 !important;
+  box-shadow: 0 3px 10px rgba(0,0,0,0.10) !important;
 }
 /* Popover / expander triggers rounded */
 div[data-testid="stPopover"] > button {
@@ -218,13 +230,13 @@ div[data-testid="stPopover"] > button {
 }
 div[data-testid="stExpander"] {
   border-radius: 10px !important;
-  border: 1px solid #eef2f7 !important;
+  border: 1px solid rgba(148,163,184,0.20) !important;
 }
 div[data-testid="stExpander"] summary { font-size: 13.5px !important; font-weight: 600 !important; }
 
 /* Metrics */
 [data-testid="stMetricValue"] { font-size: 1.4rem !important; }
-[data-testid="stMetricLabel"] { font-size: 0.78rem !important; color: #64748b !important; }
+[data-testid="stMetricLabel"] { font-size: 0.78rem !important; }
 
 /* Tabs */
 .stTabs [role="tab"] {
@@ -235,6 +247,18 @@ div[data-testid="stExpander"] summary { font-size: 13.5px !important; font-weigh
 .stTabs [role="tabpanel"] { padding-top: 8px !important; }
 
 [data-testid="stDateInput"] label { font-size: 12px !important; margin-bottom: 2px !important; }
+
+/* Alertas */
+.pt-alert-overdue {
+  background: rgba(185,28,28,0.10); border-left: 3px solid #b91c1c;
+  padding: 7px 10px; border-radius: 6px; margin-bottom: 6px; font-size: 13px;
+}
+.pt-alert-risk {
+  background: rgba(230,81,0,0.10); border-left: 3px solid #E65100;
+  padding: 7px 10px; border-radius: 6px; margin-bottom: 6px; font-size: 13px;
+}
+.pt-alert-proj { font-weight: 600; }
+.pt-alert-meta { font-size: 11.5px; opacity: 0.8; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -248,9 +272,42 @@ proyecto_names = proyectos_df["project_name"].tolist()
 proyecto_ids   = proyectos_df["project_id"].tolist()   # strings (bigint casteado a text)
 
 # ══════════════════════════════════════════════
+# ALERTAS — tareas vencidas / en riesgo (global)
+# ══════════════════════════════════════════════
+def _calcular_alertas(df: pd.DataFrame):
+    """Devuelve (vencidas, en_riesgo) — cada una lista de dicts ordenados por urgencia."""
+    today = pd.Timestamp.today().normalize()
+    vencidas, en_riesgo = [], []
+    cand = df[df["nivel"] != "Proyecto"].copy()
+    for _, r in cand.iterrows():
+        ts = calcular_timeline_status(r)
+        end = pd.to_datetime(r.get("end_date"), errors="coerce")
+        if pd.isna(end):
+            continue
+        dias = (end.normalize() - today).days
+        info = {
+            "proyecto": str(r.get("project_name", "")),
+            "tarea":    str(r.get("item_name", "")),
+            "nivel":    str(r.get("nivel", "")),
+            "resp":     str(r.get("responsible", "")),
+            "fin":      end.strftime("%d/%m/%Y"),
+            "dias":     dias,
+        }
+        if ts == "Vencido":
+            vencidas.append(info)
+        elif ts == "En riesgo":
+            en_riesgo.append(info)
+    vencidas.sort(key=lambda x: x["dias"])          # más vencidas primero
+    en_riesgo.sort(key=lambda x: x["dias"])          # las que vencen antes primero
+    return vencidas, en_riesgo
+
+_vencidas, _en_riesgo = _calcular_alertas(df_all)
+_n_alertas = len(_vencidas) + len(_en_riesgo)
+
+# ══════════════════════════════════════════════
 # HEADER
 # ══════════════════════════════════════════════
-c_logo, c_title = st.columns([0.06, 0.94])
+c_logo, c_title, c_alert = st.columns([0.05, 0.75, 0.20])
 with c_logo:
     st.markdown("<div style='font-size:2rem;margin-top:6px'>📊</div>", unsafe_allow_html=True)
 with c_title:
@@ -260,6 +317,34 @@ with c_title:
         f"<span class='pt-badge' style='background:#dcfce7;color:#166534;'>{len(df_all)} registros</span>",
         unsafe_allow_html=True,
     )
+with c_alert:
+    _alert_label = f"🔔 Alertas ({_n_alertas})" if _n_alertas else "🔔 Sin alertas"
+    with st.popover(_alert_label, use_container_width=True):
+        if _n_alertas == 0:
+            st.success("Todo en orden — no hay tareas vencidas ni en riesgo. ✅")
+        else:
+            if _vencidas:
+                st.markdown(f"**🔴 Vencidas ({len(_vencidas)})**")
+                for a in _vencidas:
+                    dias_txt = f"hace {abs(a['dias'])} día(s)" if a["dias"] < 0 else "hoy"
+                    st.markdown(
+                        f"<div class='pt-alert-overdue'>"
+                        f"<span class='pt-alert-proj'>{a['proyecto']}</span> · {a['tarea']}<br>"
+                        f"<span class='pt-alert-meta'>Venció {a['fin']} ({dias_txt})"
+                        f"{' · ' + a['resp'] if a['resp'] else ''}</span></div>",
+                        unsafe_allow_html=True,
+                    )
+            if _en_riesgo:
+                st.markdown(f"**🟠 En riesgo ({len(_en_riesgo)})**")
+                for a in _en_riesgo:
+                    dias_txt = f"vence en {a['dias']} día(s)" if a["dias"] > 0 else "vence hoy"
+                    st.markdown(
+                        f"<div class='pt-alert-risk'>"
+                        f"<span class='pt-alert-proj'>{a['proyecto']}</span> · {a['tarea']}<br>"
+                        f"<span class='pt-alert-meta'>{a['fin']} ({dias_txt})"
+                        f"{' · ' + a['resp'] if a['resp'] else ''}</span></div>",
+                        unsafe_allow_html=True,
+                    )
 
 st.markdown("<div class='pt-divider'></div>", unsafe_allow_html=True)
 
@@ -361,7 +446,12 @@ b_m2.metric("Subtareas",   len(subtareas))
 b_m3.metric("Completadas", f"{len(completadas)}/{len(tareas)}")
 
 with b_cfg:
-    with st.popover("⚙️ Estado y notas", use_container_width=True):
+    with st.popover("⚙️ Editar proyecto", use_container_width=True):
+        new_proj_name = st.text_input(
+            "Nombre del proyecto",
+            value=selected_project_name,
+            key="proj_name_input",
+        )
         new_proj_status = st.selectbox(
             "Estado del proyecto",
             PROJECT_STATUS_OPTIONS,
@@ -375,12 +465,26 @@ with b_cfg:
             placeholder="Observaciones, decisiones clave, riesgos…",
             key="proj_notes_input",
         )
-        if st.button("💾 Guardar estado y notas", use_container_width=True, type="primary", key="save_proj_meta"):
-            if proj_db_id:
+        if st.button("💾 Guardar cambios", use_container_width=True, type="primary", key="save_proj_meta"):
+            nombre_nuevo = new_proj_name.strip()
+            if not nombre_nuevo:
+                st.warning("El nombre no puede quedar vacío.")
+            elif nombre_nuevo != selected_project_name and nombre_nuevo in proyecto_names:
+                st.warning(f"Ya existe un proyecto llamado **{nombre_nuevo}**.")
+            elif proj_db_id:
+                # Actualiza estado y notas en la fila del proyecto
                 actualizar_fila(proj_db_id, {
-                    "status": new_proj_status,
-                    "notes":  new_proj_notes.strip(),
+                    "status":     new_proj_status,
+                    "notes":      new_proj_notes.strip(),
+                    "item_name":  nombre_nuevo,
+                    "project_name": nombre_nuevo,
                 })
+                # Si cambió el nombre, propágalo a tareas/subtareas (project_name)
+                # — no toca project_id ni el orden, solo la etiqueta visible.
+                if nombre_nuevo != selected_project_name:
+                    get_supabase().table(TABLE).update(
+                        {"project_name": nombre_nuevo}
+                    ).eq("project_id", selected_project_id).execute()
                 st.success("Proyecto actualizado ✅")
                 st.rerun()
 
@@ -440,13 +544,15 @@ def _render_gantt(df_g: pd.DataFrame, key_suffix: str) -> None:
 
     df_g = df_g.loc[idx_ord].reset_index(drop=True)
 
-    html_inner = build_ms_project_gantt_html(df_g, start_date=f_inicio, end_date=f_fin)
+    html_inner = build_ms_project_gantt_html(df_g, start_date=f_inicio, end_date=f_fin, theme=APP_THEME)
 
     # ── Gantt embebido ───────────────────────
     altura = max(200, len(df_g) * 36 + 110)
     components.html(html_inner, height=altura, scrolling=True)
 
     # ── Exportar HTML (debajo del gantt) ─────
+    # Siempre en tema claro para impresión / PDF
+    html_export = build_ms_project_gantt_html(df_g, start_date=f_inicio, end_date=f_fin, theme="light")
     html_standalone = f"""<!DOCTYPE html>
 <html><head>
 <meta charset="utf-8">
@@ -472,7 +578,7 @@ def _render_gantt(df_g: pd.DataFrame, key_suffix: str) -> None:
         <a href="javascript:window.print()" style="color:#2563eb;text-decoration:none;font-weight:600;">🖨 Imprimir / Guardar PDF</a>
   </span>
 </div>
-{html_inner}
+{html_export}
 </body></html>"""
 
     st.download_button(
@@ -631,15 +737,15 @@ else:
     if df_edit.empty:
         st.caption("Agrega tareas usando los formularios de arriba.")
     else:
-        st.caption("💡 Cambia el número en **Orden** para reordenar las tareas en el Gantt. Luego guarda.")
+        st.caption("Edita los campos y pulsa **Guardar cambios**. El orden se ajusta en «↕️ Reordenar».")
         edited = st.data_editor(
             df_edit,
             num_rows="fixed",
             use_container_width=True,
             hide_index=True,
             column_config={
-                "orden":        st.column_config.NumberColumn("Orden", min_value=0, max_value=999, step=1, width="small"),
-                "id":           st.column_config.NumberColumn("ID",       disabled=True, width="small"),
+                "orden":        None,   # oculto — se gestiona en «Reordenar»
+                "id":           None,   # oculto — uso interno
                 "nivel":        st.column_config.TextColumn("Nivel",      disabled=True, width="small"),
                 "item_name":    st.column_config.TextColumn("Nombre"),
                 "responsible":  st.column_config.TextColumn("Responsable"),
@@ -650,7 +756,7 @@ else:
                 "document_url": st.column_config.LinkColumn("Documento"),
                 "notes":        st.column_config.TextColumn("Notas 💬", help="Notas visibles en el Gantt como ícono 💬"),
             },
-            column_order=["orden","id","nivel","item_name","responsible","start_date","end_date","progress","status","document_url","notes"],
+            column_order=["nivel","item_name","responsible","start_date","end_date","progress","status","document_url","notes"],
             key="editor_tareas",
         )
 
@@ -678,6 +784,33 @@ else:
             else:
                 st.warning(f"Guardado con {errores} error(es).")
             st.rerun()
+
+        # ── Reordenar (orden oculto del editor principal) ──
+        with st.expander("↕️ Reordenar tareas en el Gantt"):
+            st.caption("Asigna un número de orden a cada tarea (menor = más arriba). Luego guarda.")
+            df_orden = df_edit[["id", "nivel", "item_name", "orden"]].copy()
+            orden_edit = st.data_editor(
+                df_orden,
+                num_rows="fixed",
+                use_container_width=True,
+                hide_index=True,
+                column_config={
+                    "id":        None,
+                    "nivel":     st.column_config.TextColumn("Nivel", disabled=True, width="small"),
+                    "item_name": st.column_config.TextColumn("Nombre", disabled=True),
+                    "orden":     st.column_config.NumberColumn("Orden", min_value=0, max_value=999, step=1, width="small"),
+                },
+                column_order=["nivel", "item_name", "orden"],
+                key="editor_orden",
+            )
+            if st.button("💾 Guardar orden", use_container_width=True, key="save_orden"):
+                for _, r in orden_edit.iterrows():
+                    try:
+                        actualizar_fila(int(r["id"]), {"sort_order": int(r.get("orden", 0))})
+                    except Exception as exc:
+                        st.warning(f"Error fila {r['id']}: {exc}")
+                st.success("Orden actualizado ✅")
+                st.rerun()
 
 # ── Zona peligrosa — eliminar proyecto ─────
 st.markdown("<div class='pt-divider'></div>", unsafe_allow_html=True)
