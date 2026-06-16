@@ -19,6 +19,7 @@ Esquema real de la tabla `projects`:
 """
 
 from datetime import date
+import inspect
 
 import pandas as pd
 import streamlit as st
@@ -26,6 +27,17 @@ import streamlit.components.v1 as components
 from supabase import create_client
 
 from gantt import build_ms_project_gantt_html
+
+# El parámetro `theme` solo existe en la versión nueva de gantt.py.
+# Si se está usando una versión anterior, lo omitimos para no romper la app.
+_GANTT_ACEPTA_THEME = "theme" in inspect.signature(build_ms_project_gantt_html).parameters
+
+
+def render_gantt_html(df_g, start_date=None, end_date=None, theme="light"):
+    """Llama a build_ms_project_gantt_html pasando `theme` solo si está soportado."""
+    if _GANTT_ACEPTA_THEME:
+        return build_ms_project_gantt_html(df_g, start_date=start_date, end_date=end_date, theme=theme)
+    return build_ms_project_gantt_html(df_g, start_date=start_date, end_date=end_date)
 
 # ══════════════════════════════════════════════
 # CONFIGURACIÓN
@@ -544,7 +556,7 @@ def _render_gantt(df_g: pd.DataFrame, key_suffix: str) -> None:
 
     df_g = df_g.loc[idx_ord].reset_index(drop=True)
 
-    html_inner = build_ms_project_gantt_html(df_g, start_date=f_inicio, end_date=f_fin, theme=APP_THEME)
+    html_inner = render_gantt_html(df_g, start_date=f_inicio, end_date=f_fin, theme=APP_THEME)
 
     # ── Gantt embebido ───────────────────────
     altura = max(200, len(df_g) * 36 + 110)
@@ -552,7 +564,7 @@ def _render_gantt(df_g: pd.DataFrame, key_suffix: str) -> None:
 
     # ── Exportar HTML (debajo del gantt) ─────
     # Siempre en tema claro para impresión / PDF
-    html_export = build_ms_project_gantt_html(df_g, start_date=f_inicio, end_date=f_fin, theme="light")
+    html_export = render_gantt_html(df_g, start_date=f_inicio, end_date=f_fin, theme="light")
     html_standalone = f"""<!DOCTYPE html>
 <html><head>
 <meta charset="utf-8">
