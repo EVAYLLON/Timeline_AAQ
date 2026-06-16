@@ -43,10 +43,11 @@ TABLE = "projects"
 _COLS_SELECT = (
     "id,nivel,project_id,project_name,"
     "item_id,item_name,parent_id,"
-    "responsible,start_date,end_date,progress,status,document_url,sort_order"
+    "responsible,start_date,end_date,progress,status,document_url,sort_order,notes"
 )
 
 STATUS_OPTIONS = ["No iniciado", "En curso", "Completado", "Cancelado", "En riesgo"]
+PROJECT_STATUS_OPTIONS = ["En curso", "Completado", "Cancelado", "En riesgo", "No iniciado"]
 
 # ══════════════════════════════════════════════
 # SUPABASE
@@ -81,6 +82,7 @@ def cargar_datos() -> pd.DataFrame:
         ("project_id",   ""),
         ("progress",     0),
         ("sort_order",   0),
+        ("notes",        ""),
     ]:
         if col not in df.columns:
             df[col] = default
@@ -97,7 +99,7 @@ def cargar_datos() -> pd.DataFrame:
     df["end_date"]   = pd.to_datetime(df["end_date"],   errors="coerce")
 
     # Strings limpios
-    for col in ["nivel", "project_name", "item_name", "responsible", "status", "document_url"]:
+    for col in ["nivel", "project_name", "item_name", "responsible", "status", "document_url", "notes"]:
         if col in df.columns:
             df[col] = df[col].fillna("").astype(str).str.strip()
 
@@ -178,16 +180,36 @@ st.markdown("""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&display=swap');
 html, body, [class*="css"] { font-family: 'DM Sans', sans-serif !important; }
-.block-container { padding-top: 1.5rem !important; padding-bottom: 2rem !important; }
-h1 { font-size: 1.6rem !important; font-weight: 700 !important; letter-spacing: -0.03em; color: #0f172a; }
-h2 { font-size: 1.15rem !important; font-weight: 600 !important; color: #1e293b; }
-h3 { font-size: 1rem !important; font-weight: 600 !important; color: #334155; }
+.block-container { padding-top: 1.2rem !important; padding-bottom: 2rem !important; max-width: 100% !important; }
+h1 { font-size: 1.5rem !important; font-weight: 700 !important; letter-spacing: -0.03em; color: #0f172a; }
+h2 { font-size: 1.1rem !important; font-weight: 600 !important; color: #1e293b; }
+h3 { font-size: 0.92rem !important; font-weight: 600 !important; color: #334155; }
 .pt-badge {
   display: inline-block; font-size: 11px; font-weight: 600;
   padding: 2px 9px; border-radius: 99px;
   background: #e0f2fe; color: #0369a1;
 }
-.pt-divider { height: 1px; background: #f1f5f9; margin: 16px 0; }
+.pt-divider { height: 1px; background: #f1f5f9; margin: 12px 0; }
+
+/* Compact the left management panel */
+section[data-testid="stSidebar"] { display: none; }
+div[data-testid="stExpander"] summary { font-size: 13px !important; padding: 6px 12px !important; }
+div[data-testid="stExpander"] > div { padding: 8px 12px !important; }
+
+/* Make metric values smaller in left panel */
+[data-testid="stMetricValue"] { font-size: 1.3rem !important; }
+[data-testid="stMetricLabel"] { font-size: 0.75rem !important; }
+
+/* Gantt tab styling */
+.stTabs [role="tab"] {
+  font-size: 13px !important;
+  font-weight: 600 !important;
+  padding: 6px 16px !important;
+}
+.stTabs [role="tabpanel"] { padding-top: 8px !important; }
+
+/* Date inputs side by side — compact */
+[data-testid="stDateInput"] label { font-size: 12px !important; margin-bottom: 2px !important; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -219,7 +241,7 @@ st.markdown("<div class='pt-divider'></div>", unsafe_allow_html=True)
 # ══════════════════════════════════════════════
 # LAYOUT
 # ══════════════════════════════════════════════
-col_mgmt, col_gantt = st.columns([0.32, 0.68], gap="large")
+col_mgmt, col_gantt = st.columns([0.25, 0.75], gap="large")
 
 with col_mgmt:
 
@@ -283,6 +305,56 @@ with col_mgmt:
     tareas    = df_proj[df_proj["nivel"] == "Tarea"]
     subtareas = df_proj[df_proj["nivel"] == "Subtarea"]
     completadas = tareas[tareas["status"] == "Completado"]
+
+    # ── Estado del proyecto ────────────────────
+    proj_row = df_proj[df_proj["nivel"] == "Proyecto"]
+    proj_db_id = None
+    proj_current_status = "En curso"
+    proj_current_notes  = ""
+    if not proj_row.empty:
+        proj_db_id = int(proj_row.iloc[0]["id"])
+        proj_current_status = str(proj_row.iloc[0].get("status", "En curso"))
+        proj_current_notes  = str(proj_row.iloc[0].get("notes", "") or "")
+
+    # Estado + badge del proyecto
+    _status_colors = {
+        "Completado": ("#166534", "#dcfce7"),
+        "En curso":   ("#1e40af", "#dbeafe"),
+        "Cancelado":  ("#6b7280", "#f3f4f6"),
+        "En riesgo":  ("#92400e", "#fef3c7"),
+        "No iniciado":("#475569", "#f1f5f9"),
+    }
+    _sc, _sb = _status_colors.get(proj_current_status, ("#475569", "#f1f5f9"))
+    st.markdown(
+        f"<div style='margin:6px 0 4px;'>"
+        f"<span style='font-size:11px;font-weight:600;color:{_sc};"
+        f"background:{_sb};padding:3px 10px;border-radius:99px;'>"
+        f"● {proj_current_status}</span></div>",
+        unsafe_allow_html=True
+    )
+
+    with st.expander("⚙️ Estado y notas del proyecto"):
+        new_proj_status = st.selectbox(
+            "Estado del proyecto",
+            PROJECT_STATUS_OPTIONS,
+            index=PROJECT_STATUS_OPTIONS.index(proj_current_status) if proj_current_status in PROJECT_STATUS_OPTIONS else 0,
+            key="proj_status_sel",
+        )
+        new_proj_notes = st.text_area(
+            "Notas del proyecto",
+            value=proj_current_notes,
+            height=80,
+            placeholder="Observaciones, decisiones clave, riesgos…",
+            key="proj_notes_input",
+        )
+        if st.button("💾 Guardar estado y notas", use_container_width=True, type="primary", key="save_proj_meta"):
+            if proj_db_id:
+                actualizar_fila(proj_db_id, {
+                    "status": new_proj_status,
+                    "notes":  new_proj_notes.strip(),
+                })
+                st.success("Proyecto actualizado ✅")
+                st.rerun()
 
     m1, m2, m3 = st.columns(3)
     m1.metric("Tareas",      len(tareas))
@@ -376,7 +448,7 @@ with col_mgmt:
         # Excluir la fila del Proyecto del editor (solo tareas y subtareas)
         df_edit = df_proj[df_proj["nivel"] != "Proyecto"][[
             "id", "nivel", "item_name", "responsible",
-            "start_date", "end_date", "progress", "status", "document_url"
+            "start_date", "end_date", "progress", "status", "document_url", "notes"
         ]].copy()
 
         df_edit["start_date"] = pd.to_datetime(df_edit["start_date"], errors="coerce")
@@ -410,8 +482,9 @@ with col_mgmt:
                     "progress":     st.column_config.NumberColumn("Avance %", min_value=0, max_value=100, step=5),
                     "status":       st.column_config.SelectboxColumn("Estado", options=STATUS_OPTIONS),
                     "document_url": st.column_config.LinkColumn("Documento"),
+                    "notes":        st.column_config.TextColumn("Notas 💬", help="Notas visibles en el Gantt como ícono 💬"),
                 },
-                column_order=["orden","id","nivel","item_name","responsible","start_date","end_date","progress","status","document_url"],
+                column_order=["orden","id","nivel","item_name","responsible","start_date","end_date","progress","status","document_url","notes"],
                 key="editor_tareas",
             )
 
@@ -428,6 +501,7 @@ with col_mgmt:
                             "status":       str(row.get("status", "No iniciado")),
                             "document_url": str(row.get("document_url", "")).strip(),
                             "sort_order":   int(row.get("orden", 0)),
+                            "notes":        str(row.get("notes", "")).strip(),
                         })
                     except Exception as exc:
                         st.warning(f"Error fila {row['id']}: {exc}")
@@ -567,7 +641,7 @@ with col_gantt:
         html_inner = build_ms_project_gantt_html(df_g, start_date=f_inicio, end_date=f_fin)
 
         # ── Gantt embebido ───────────────────────
-        altura = max(200, min(len(df_g) * 36 + 90, 620))
+        altura = max(200, len(df_g) * 36 + 110)
         components.html(html_inner, height=altura, scrolling=True)
 
         # ── Exportar HTML (debajo del gantt) ─────
