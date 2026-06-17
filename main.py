@@ -316,20 +316,9 @@ def _calcular_alertas(df: pd.DataFrame):
 _vencidas, _en_riesgo = _calcular_alertas(df_all)
 _n_alertas = len(_vencidas) + len(_en_riesgo)
 
-# ══════════════════════════════════════════════
-# HEADER
-# ══════════════════════════════════════════════
-c_logo, c_title, c_alert = st.columns([0.05, 0.75, 0.20])
-with c_logo:
-    st.markdown("<div style='font-size:2rem;margin-top:6px'>📊</div>", unsafe_allow_html=True)
-with c_title:
-    st.markdown("<h1>Project Tracker</h1>", unsafe_allow_html=True)
-    st.markdown(
-        f"<span class='pt-badge'>{len(proyecto_ids)} proyecto{'s' if len(proyecto_ids)!=1 else ''}</span>&nbsp;"
-        f"<span class='pt-badge' style='background:#dcfce7;color:#166534;'>{len(df_all)} registros</span>",
-        unsafe_allow_html=True,
-    )
-with c_alert:
+
+def _render_alertas_popover():
+    """Botón desplegable con las tareas vencidas / en riesgo."""
     _alert_label = f"🔔 Alertas ({_n_alertas})" if _n_alertas else "🔔 Sin alertas"
     with st.popover(_alert_label, use_container_width=True):
         if _n_alertas == 0:
@@ -357,6 +346,21 @@ with c_alert:
                         f"{' · ' + a['resp'] if a['resp'] else ''}</span></div>",
                         unsafe_allow_html=True,
                     )
+
+
+# ══════════════════════════════════════════════
+# HEADER
+# ══════════════════════════════════════════════
+c_logo, c_title = st.columns([0.05, 0.95])
+with c_logo:
+    st.markdown("<div style='font-size:2rem;margin-top:6px'>📊</div>", unsafe_allow_html=True)
+with c_title:
+    st.markdown("<h1>Project Tracker</h1>", unsafe_allow_html=True)
+    st.markdown(
+        f"<span class='pt-badge'>{len(proyecto_ids)} proyecto{'s' if len(proyecto_ids)!=1 else ''}</span>&nbsp;"
+        f"<span class='pt-badge' style='background:#dcfce7;color:#166534;'>{len(df_all)} registros</span>",
+        unsafe_allow_html=True,
+    )
 
 st.markdown("<div class='pt-divider'></div>", unsafe_allow_html=True)
 
@@ -428,10 +432,26 @@ proj_row = df_proj[df_proj["nivel"] == "Proyecto"]
 proj_db_id = None
 proj_current_status = "En curso"
 proj_current_notes  = ""
+proj_current_start  = date.today()
+proj_current_end    = date.today()
+proj_current_prog   = 0
 if not proj_row.empty:
-    proj_db_id = int(proj_row.iloc[0]["id"])
-    proj_current_status = str(proj_row.iloc[0].get("status", "En curso"))
-    proj_current_notes  = str(proj_row.iloc[0].get("notes", "") or "")
+    _pr = proj_row.iloc[0]
+    proj_db_id = int(_pr["id"])
+    proj_current_status = str(_pr.get("status", "En curso"))
+    proj_current_notes  = str(_pr.get("notes", "") or "")
+    try:
+        proj_current_start = pd.to_datetime(_pr.get("start_date")).date()
+    except Exception:
+        pass
+    try:
+        proj_current_end = pd.to_datetime(_pr.get("end_date")).date()
+    except Exception:
+        pass
+    try:
+        proj_current_prog = int(float(_pr.get("progress", 0)))
+    except Exception:
+        pass
 
 _status_colors = {
     "Completado": ("#166534", "#dcfce7"),
@@ -441,8 +461,8 @@ _status_colors = {
     "No iniciado":("#475569", "#f1f5f9"),
 }
 
-# ── Fila de estado + métricas ──────────────
-b_badge, b_m1, b_m2, b_m3, b_cfg = st.columns([0.30, 0.16, 0.16, 0.18, 0.20])
+# ── Fila de estado + métricas + alertas ────
+b_badge, b_m1, b_m2, b_m3, b_alert, b_cfg = st.columns([0.24, 0.13, 0.13, 0.15, 0.17, 0.18])
 
 with b_badge:
     _sc, _sb = _status_colors.get(proj_current_status, ("#475569", "#f1f5f9"))
@@ -457,12 +477,24 @@ b_m1.metric("Tareas",      len(tareas))
 b_m2.metric("Subtareas",   len(subtareas))
 b_m3.metric("Completadas", f"{len(completadas)}/{len(tareas)}")
 
+with b_alert:
+    st.write("")  # pequeño espacio para alinear el botón
+    _render_alertas_popover()
+
 with b_cfg:
+    st.write("")
     with st.popover("⚙️ Editar proyecto", use_container_width=True):
         new_proj_name = st.text_input(
             "Nombre del proyecto",
             value=selected_project_name,
             key="proj_name_input",
+        )
+        pc1, pc2 = st.columns(2)
+        new_proj_start = pc1.date_input("Inicio", value=proj_current_start, key="proj_start_input")
+        new_proj_end   = pc2.date_input("Fin",    value=proj_current_end,   key="proj_end_input")
+        new_proj_prog  = st.number_input(
+            "Avance %", min_value=0, max_value=100, step=5,
+            value=int(proj_current_prog), key="proj_prog_input",
         )
         new_proj_status = st.selectbox(
             "Estado del proyecto",
@@ -481,15 +513,20 @@ with b_cfg:
             nombre_nuevo = new_proj_name.strip()
             if not nombre_nuevo:
                 st.warning("El nombre no puede quedar vacío.")
+            elif new_proj_end < new_proj_start:
+                st.warning("La fecha Fin no puede ser anterior a Inicio.")
             elif nombre_nuevo != selected_project_name and nombre_nuevo in proyecto_names:
                 st.warning(f"Ya existe un proyecto llamado **{nombre_nuevo}**.")
             elif proj_db_id:
-                # Actualiza estado y notas en la fila del proyecto
+                # Actualiza datos en la fila del proyecto
                 actualizar_fila(proj_db_id, {
-                    "status":     new_proj_status,
-                    "notes":      new_proj_notes.strip(),
-                    "item_name":  nombre_nuevo,
+                    "status":       new_proj_status,
+                    "notes":        new_proj_notes.strip(),
+                    "item_name":    nombre_nuevo,
                     "project_name": nombre_nuevo,
+                    "start_date":   new_proj_start.isoformat(),
+                    "end_date":     new_proj_end.isoformat(),
+                    "progress":     int(new_proj_prog),
                 })
                 # Si cambió el nombre, propágalo a tareas/subtareas (project_name)
                 # — no toca project_id ni el orden, solo la etiqueta visible.
@@ -519,10 +556,35 @@ def _render_gantt(df_g: pd.DataFrame, key_suffix: str) -> None:
     min_d = df_g["start_date"].min()
     max_d = df_g["end_date"].max()
 
+    # Fechas por defecto (rango completo de los datos)
+    def _to_date(x, fallback):
+        try:
+            return pd.to_datetime(x).date()
+        except Exception:
+            return fallback
+
+    default_ini = _to_date(min_d, date.today())
+    default_fin = _to_date(max_d, date.today())
+
+    gi_key = f"gi_{key_suffix}"
+    gf_key = f"gf_{key_suffix}"
+
+    # Inicializa una sola vez; luego conserva la elección del usuario
+    if gi_key not in st.session_state:
+        st.session_state[gi_key] = default_ini
+    if gf_key not in st.session_state:
+        st.session_state[gf_key] = default_fin
+
     # ── Controles de rango ───────────────────
-    cf1, cf2, _sp = st.columns([0.20, 0.20, 0.60])
-    f_inicio = cf1.date_input("Desde", value=min_d, key=f"gi_{key_suffix}")
-    f_fin    = cf2.date_input("Hasta", value=max_d, key=f"gf_{key_suffix}")
+    cf1, cf2, cf3 = st.columns([0.20, 0.20, 0.60])
+    f_inicio = cf1.date_input("Desde", key=gi_key)
+    f_fin    = cf2.date_input("Hasta", key=gf_key)
+    with cf3:
+        st.write("")  # alinea verticalmente
+        if st.button("🔄 Ajustar al rango completo", key=f"reset_{key_suffix}"):
+            st.session_state[gi_key] = default_ini
+            st.session_state[gf_key] = default_fin
+            st.rerun()
 
     df_g["timeline_status"] = df_g.apply(calcular_timeline_status, axis=1)
 
@@ -607,7 +669,7 @@ tab_uno, tab_todos = st.tabs([
     "Todos los proyectos",
 ])
 with tab_uno:
-    _render_gantt(df_proj, "uno")
+    _render_gantt(df_proj, f"uno_{selected_project_id}")
 with tab_todos:
     _render_gantt(df_all, "todos")
 
